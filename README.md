@@ -211,8 +211,24 @@ docker compose pull               # Pull latest images
 
 ## 🌐 Environment Variables
 
-### Frontend (.env)
+### ⚠️ Security Notice
 
+**NEVER commit actual credentials or secrets to version control!** Always use:
+- `.env` files for local development (ignored by git)
+- `.env.example` files as templates with placeholder values
+- Environment variables or secret management systems in production
+
+### Frontend Configuration (.env)
+
+Create a `frontend/.env` file based on `frontend/.env.example`:
+
+```bash
+cp frontend/.env.example frontend/.env
+```
+
+Then edit with your actual values. Never commit this file.
+
+**Example (after setup):**
 ```env
 VITE_API_BASE_URL=http://localhost:3000/api/v1
 VITE_API_TIMEOUT=10000
@@ -220,29 +236,45 @@ VITE_APP_NAME=Gramdit
 VITE_APP_VERSION=1.0.0
 ```
 
-### Backend (.env)
+### Backend Configuration (.env)
 
+Create a `backend/.env` file based on `backend/.env.example`:
+
+```bash
+cp backend/.env.example backend/.env
+```
+
+Then edit with your actual database credentials and secrets. **Never commit this file.**
+
+**Required Fields (replace with your own values):**
 ```env
 NODE_ENV=development
 PORT=3000
 
-# Database
+# Database - Use STRONG passwords in production!
 DB_HOST=postgres
 DB_PORT=5432
-DB_USERNAME=gramdit
-DB_PASSWORD=gramdit_password
-DB_DATABASE=gramdit_db
+DB_USERNAME=your_db_username
+DB_PASSWORD=your_secure_password
+DB_DATABASE=your_db_name
 
 # Redis
 REDIS_HOST=redis
 REDIS_PORT=6379
-REDIS_PASSWORD=
+REDIS_PASSWORD=your_redis_password
 REDIS_DB=0
 
 # API
 API_PREFIX=/api/v1
 CORS_ORIGIN=http://localhost:5173
 ```
+
+### Template Files
+
+- `frontend/.env.example` - Contains placeholder values for frontend configuration
+- `backend/.env.example` - Contains placeholder values for backend configuration
+
+**Always update `.env.example` when adding new environment variables, but use placeholder values!**
 
 ## 🔍 Health Checks
 
@@ -266,7 +298,8 @@ Expected response:
 
 ### PostgreSQL Health Check
 ```bash
-docker compose exec postgres pg_isready -U gramdit
+# Check if PostgreSQL is running (use your actual username)
+docker compose exec postgres pg_isready -U your_db_username
 ```
 
 ### Redis Health Check
@@ -307,13 +340,33 @@ npm run migration:revert
 ```
 
 ### Access PostgreSQL
+
+⚠️ **Never share database credentials!** Use your own credentials from `.env`:
+
 ```bash
-docker compose exec postgres psql -U gramdit -d gramdit_db
+# Replace 'your_db_username' and 'your_db_name' with your actual values
+docker compose exec postgres psql -U your_db_username -d your_db_name
+```
+
+Then you can run SQL commands:
+```sql
+SELECT version();
+\dt  -- List tables
+\du  -- List users/roles
 ```
 
 ### Access Redis
+
 ```bash
 docker compose exec redis redis-cli
+
+# Common commands:
+PING              # Test connection
+KEYS *            # List all keys
+GET key_name      # Get a value
+SET key value     # Set a value
+DEL key_name      # Delete a key
+FLUSHDB           # Clear all keys (USE WITH CAUTION)
 ```
 
 ## 🐛 Troubleshooting
@@ -397,6 +450,95 @@ npm run format
 2. Make your changes
 3. Run linting and tests
 4. Submit a pull request
+
+## 🔒 Security & Secrets Management
+
+### Environment Variables Best Practices
+
+**DO:**
+- ✅ Store secrets in `.env` files (ignored by git)
+- ✅ Use `.env.example` with placeholder values for documentation
+- ✅ Use strong passwords in production (min. 16 characters, mixed case, numbers, symbols)
+- ✅ Rotate secrets regularly
+- ✅ Use environment-specific configurations
+- ✅ Run `git status` before committing to verify no `.env` files are staged
+
+**DON'T:**
+- ❌ Never commit `.env` files
+- ❌ Never hardcode secrets in source code
+- ❌ Never share credentials in documentation or logs
+- ❌ Never use default/weak passwords in production
+- ❌ Never store secrets in Docker Compose files directly
+
+### Files to NEVER Commit
+
+```
+.env
+.env.local
+.env.*.local
+*.env
+
+# Database files
+*.sqlite
+*.db
+
+# Logs (may contain sensitive data)
+logs/
+*.log
+
+# OS/IDE files with potential secrets
+.vscode/
+.idea/
+
+# Node modules
+node_modules/
+
+# Docker data
+postgres_data/
+redis_data/
+```
+
+### Checking Before Push
+
+Always verify your `.gitignore` is working:
+
+```bash
+# List files that will be committed
+git ls-files
+
+# Should NOT include:
+# - .env files
+# - database credentials
+# - API keys
+# - JWT secrets
+
+# If you accidentally committed secrets:
+git rm --cached .env
+git commit --amend -m "Remove .env file"
+```
+
+### Production Deployment
+
+For production deployments:
+- Use a secret management system (AWS Secrets Manager, HashiCorp Vault, etc.)
+- Never use Docker Compose for production
+- Use environment variables provided by your platform
+- Implement secret rotation policies
+- Enable audit logging for secret access
+
+### Sensitive Information
+
+Treat as secrets:
+- Database usernames and passwords
+- API keys and tokens
+- JWT secrets
+- OAuth credentials
+- SMTP credentials
+- AWS/Cloud provider credentials
+- Session secrets
+- Encryption keys
+- Webhook URLs with authentication
+- Third-party service tokens
 
 ## 📄 License
 

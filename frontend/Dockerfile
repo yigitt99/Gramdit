@@ -7,7 +7,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install dependencies
-RUN npm ci
+RUN npm install
 
 # Copy source code
 COPY . .
@@ -29,5 +29,6 @@ COPY --from=builder /app/dist ./dist
 # Expose port
 EXPOSE 5173
 
-# Start the application
-CMD ["serve", "-s", "dist", "-l", "5173"]
+# Start the application with serve
+# Serve on all interfaces and use SPA fallback
+CMD ["serve", "-s", "dist", "-l", "5173", "--no-clipboard", "--single"]

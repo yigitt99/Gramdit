@@ -1,5 +1,5 @@
 # ============================================
-# Dependencies
+# Node & NPM (SENSITIVE)
 # ============================================
 node_modules/
 npm-debug.log
@@ -16,7 +16,6 @@ pnpm-lock.yaml
 .env.development.local
 .env.production.local
 .env.test.local
-.env.*.local
 *.env
 
 # ============================================
@@ -24,8 +23,6 @@ pnpm-lock.yaml
 # ============================================
 dist/
 build/
-.next/
-out/
 *.tsbuildinfo
 
 # ============================================
@@ -43,16 +40,6 @@ out/
 *.swo
 *~
 .DS_Store
-.AppleDouble
-.LSOverride
-.project
-.pydevproject
-.settings/
-*.sublime-workspace
-*.sublime-project
-.classpath
-.c9/
-*.class
 
 # ============================================
 # Testing & Coverage
@@ -64,85 +51,35 @@ test-results/
 junit.xml
 
 # ============================================
-# Logs (SENSITIVE - Contains runtime secrets potentially)
+# Logs (SENSITIVE - May contain credentials)
 # ============================================
 logs/
 *.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-lerna-debug.log*
-.pnpm-debug.log*
-pids/
-*.pid
-*.seed
-*.pid.lock
 
 # ============================================
-# Database Files (SENSITIVE)
+# Database (SENSITIVE)
 # ============================================
 *.sqlite
 *.sqlite3
 *.db
-*.db-journal
-database.yml
 
 # ============================================
-# Docker
-# ============================================
-.docker/
-.dockerignore
-Dockerfile
-
-# ============================================
-# OS & System Files
-# ============================================
-Thumbs.db
-ehthumbs.db
-Desktop.ini
-.Spotlight-V100
-.Trashes
-
-# ============================================
-# AWS & Cloud (SENSITIVE - Contains credentials)
-# ============================================
-.aws/credentials
-.aws/config
-*.pem
-*.key
-*.pfx
-*.p8
-
-# ============================================
-# SSL/TLS Certificates (SENSITIVE)
-# ============================================
-*.crt
-*.cert
-*.ca
-*.p12
-
-# ============================================
-# Local Development Scripts
+# Local Development
 # ============================================
 .local/
 .tmp/
 temp/
 
 # ============================================
-# Redis, PostgreSQL local data
+# OS Files
 # ============================================
-postgres_data/
-redis_data/
-pgadmin_lib/
+Thumbs.db
+ehthumbs.db
 
 # ============================================
-# Runtime & Temporary
+# NestJS Specific
 # ============================================
-.cache/
-.next/cache/
-dist-ssr/
-*.egg-info/
-.pytest_cache/
-.venv/
-env/
-venv/
+dist/
+node_modules/
+test/
+jest-junit-results.xml

@@ -1,3 +1,4 @@
+version: '3.8'
 
 services:
   # PostgreSQL Database
@@ -6,17 +7,19 @@ services:
     container_name: gramdit-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: gramdit
-      POSTGRES_PASSWORD: gramdit_password
-      POSTGRES_DB: gramdit_db
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_INITDB_ARGS: "-E UTF8"
     ports:
-      - "5432:5432"
+      # DBeaver çakışmasını önleyen dış portu da .env üzerinden güvenle yönetiyoruz
+      - "${DB_EXTERNAL_PORT}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - gramdit-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U gramdit"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -52,9 +55,9 @@ services:
       PORT: 3000
       DB_HOST: postgres
       DB_PORT: 5432
-      DB_USERNAME: gramdit
-      DB_PASSWORD: gramdit_password
-      DB_DATABASE: gramdit_db
+      DB_USERNAME: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_DATABASE: ${DB_NAME}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_DB: 0
@@ -70,6 +73,7 @@ services:
     volumes:
       - ./backend:/app
       - /app/node_modules
+      - /app/dist
 
   # Frontend Service
   frontend:

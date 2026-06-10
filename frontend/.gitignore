@@ -1,0 +1,70 @@
+# ============================================
+# Node & NPM (SENSITIVE)
+# ============================================
+node_modules/
+npm-debug.log
+yarn-error.log
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# ============================================
+# Environment Variables (SENSITIVE - NEVER COMMIT)
+# ============================================
+.env
+.env.local
+.env.development.local
+.env.production.local
+.env.test.local
+*.env
+
+# ============================================
+# Build Outputs
+# ============================================
+dist/
+build/
+.next/
+out/
+*.tsbuildinfo
+
+# ============================================
+# IDE & Editor
+# ============================================
+.vscode/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.idea/
+.idea_modules/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# ============================================
+# Testing & Coverage
+# ============================================
+coverage/
+.nyc_output/
+test-results/
+
+# ============================================
+# Logs (SENSITIVE)
+# ============================================
+logs/
+*.log
+
+# ============================================
+# Local Development
+# ============================================
+.local/
+.tmp/
+temp/
+
+# ============================================
+# OS Files
+# ============================================
+Thumbs.db
+ehthumbs.db

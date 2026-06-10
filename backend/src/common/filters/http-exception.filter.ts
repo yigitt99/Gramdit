@@ -27,10 +27,10 @@ export class HttpExceptionFilter implements ExceptionFilter {
       const exceptionResponse = exception.getResponse();
 
       if (typeof exceptionResponse === 'object' && exceptionResponse !== null) {
-        const response = exceptionResponse as Record<string, unknown>;
-        message = (response.message as string) || message;
-        code = (response.error as string) || code;
-        details = response.details;
+        const responseObj = exceptionResponse as Record<string, unknown>;
+        message = (responseObj.message as string) || message;
+        code = (responseObj.error as string) || code;
+        details = responseObj.details;
       } else {
         message = exceptionResponse as string;
       }
@@ -38,16 +38,21 @@ export class HttpExceptionFilter implements ExceptionFilter {
       message = exception.message;
     }
 
-    const errorResponse = {
+    // 1. Önce sabit olan alanlarla temel objeyi oluşturuyoruz
+    const errorResponse: any = {
       success: false,
       error: {
         code,
         message,
-        ...(details && { details }),
       },
       timestamp: new Date().toISOString(),
       path: request.url,
     };
+
+    // 2. Eğer details verisi varsa, TypeScript'i kızdırmadan objeye ekliyoruz
+    if (details) {
+      errorResponse.error.details = details;
+    }
 
     this.logger.error(
       `${request.method} ${request.url} - ${status} - ${message}`,
