@@ -1,7 +1,9 @@
 # ============================================
-# Dependencies
+# Dependencies 
 # ============================================
 node_modules/
+backend/node_modules/
+frontend/node_modules/
 npm-debug.log
 yarn-error.log
 package-lock.json
@@ -9,7 +11,7 @@ yarn.lock
 pnpm-lock.yaml
 
 # ============================================
-# Environment Variables (SENSITIVE - NEVER COMMIT)
+# Environment Variables (SENSITIVE)
 # ============================================
 .env
 .env.local
@@ -18,11 +20,15 @@ pnpm-lock.yaml
 .env.test.local
 .env.*.local
 *.env
+backend/.env
+frontend/.env
 
 # ============================================
-# Build Outputs
+# Build Outputs (Gereksiz Kalıntılar)
 # ============================================
 dist/
+backend/dist/
+frontend/dist/
 build/
 .next/
 out/
@@ -64,7 +70,7 @@ test-results/
 junit.xml
 
 # ============================================
-# Logs (SENSITIVE - Contains runtime secrets potentially)
+# Logs (SENSITIVE)
 # ============================================
 logs/
 *.log
@@ -88,11 +94,11 @@ pids/
 database.yml
 
 # ============================================
-# Docker
+# Docker configuration
 # ============================================
 .docker/
-.dockerignore
-Dockerfile
+# NOT: Dockerfile ve .dockerignore talimatları GitHub'a gitmeli, 
+# gerçek veriler/şifreler gitmemeli. O yüzden o satırları kaldırdık.
 
 # ============================================
 # OS & System Files
@@ -104,7 +110,7 @@ Desktop.ini
 .Trashes
 
 # ============================================
-# AWS & Cloud (SENSITIVE - Contains credentials)
+# AWS & Cloud (SENSITIVE)
 # ============================================
 .aws/credentials
 .aws/config
@@ -129,7 +135,7 @@ Desktop.ini
 temp/
 
 # ============================================
-# Redis, PostgreSQL local data
+# Redis, PostgreSQL Local Data 
 # ============================================
 postgres_data/
 redis_data/
