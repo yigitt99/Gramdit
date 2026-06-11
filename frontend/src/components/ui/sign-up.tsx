@@ -1,7 +1,7 @@
 import { cn } from "@/utils";
 import React, { useState, useRef, useEffect, forwardRef, useImperativeHandle, useMemo, useCallback, Children } from "react";
 import { cva, type VariantProps } from "class-variance-authority";
-import { ArrowRight, Mail, Lock, Eye, EyeOff, ArrowLeft, X, AlertCircle, PartyPopper, Loader, User, FileText, ImageIcon, CheckCircle2, Camera } from "lucide-react";
+import { ArrowRight, Mail, Lock, Eye, EyeOff, X, AlertCircle, PartyPopper, Loader, User, FileText, ImageIcon, CheckCircle2, Camera } from "lucide-react";
 import { AnimatePresence, motion, useInView, Variants, Transition } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import useStore from "@/store";
@@ -117,24 +117,59 @@ GlassButton.displayName = "GlassButton";
 const GradientBackground = () => (
     <>
         <style>
-            {` @keyframes float1 { 0% { transform: translate(0, 0); } 50% { transform: translate(-10px, 10px); } 100% { transform: translate(0, 0); } } @keyframes float2 { 0% { transform: translate(0, 0); } 50% { transform: translate(10px, -10px); } 100% { transform: translate(0, 0); } } `}
+            {` 
+            @keyframes floatYellow { 
+              0% { transform: translate(0, 0) scale(1); } 
+              50% { transform: translate(-20px, 10px) scale(1.05); } 
+              100% { transform: translate(0, 0) scale(1); } 
+            } 
+            @keyframes floatPurple { 
+              0% { transform: translate(0, 0) scale(1); } 
+              50% { transform: translate(15px, -15px) scale(0.95); } 
+              100% { transform: translate(0, 0) scale(1); } 
+            } 
+            @keyframes floatRed { 
+              0% { transform: translate(0, 0); } 
+              50% { transform: translate(10px, 20px); } 
+              100% { transform: translate(0, 0); } 
+            }
+            `}
         </style>
         <svg width="100%" height="100%" viewBox="0 0 800 600" fill="none" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice" className="absolute top-0 left-0 w-full h-full">
             <defs>
-                <linearGradient id="rev_grad1" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style={{stopColor: 'var(--color-primary)', stopOpacity:0.8}} /><stop offset="100%" style={{stopColor: 'var(--color-chart-3)', stopOpacity:0.6}} /></linearGradient>
-                <linearGradient id="rev_grad2" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style={{stopColor: 'var(--color-chart-4)', stopOpacity:0.9}} /><stop offset="50%" style={{stopColor: 'var(--color-secondary)', stopOpacity:0.7}} /><stop offset="100%" style={{stopColor: 'var(--color-chart-1)', stopOpacity:0.6}} /></linearGradient>
-                <radialGradient id="rev_grad3" cx="50%" cy="50%" r="50%"><stop offset="0%" style={{stopColor: 'var(--color-destructive)', stopOpacity:0.8}} /><stop offset="100%" style={{stopColor: 'var(--color-chart-5)', stopOpacity:0.4}} /></radialGradient>
-                <filter id="rev_blur1" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="35"/></filter>
-                <filter id="rev_blur2" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="25"/></filter>
-                <filter id="rev_blur3" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="45"/></filter>
+                {/* Yellow glow bottom-left */}
+                <radialGradient id="glow_yellow" cx="50%" cy="50%" r="50%">
+                    <stop offset="0%" stopColor="#d9a05b" stopOpacity="0.45" />
+                    <stop offset="100%" stopColor="#d9a05b" stopOpacity="0" />
+                </radialGradient>
+                {/* Purple/Pink glow top-right */}
+                <radialGradient id="glow_purple" cx="50%" cy="50%" r="50%">
+                    <stop offset="0%" stopColor="#a855f7" stopOpacity="0.45" />
+                    <stop offset="50%" stopColor="#ec4899" stopOpacity="0.25" />
+                    <stop offset="100%" stopColor="#a855f7" stopOpacity="0" />
+                </radialGradient>
+                {/* Red glow bottom-right */}
+                <radialGradient id="glow_red" cx="50%" cy="50%" r="50%">
+                    <stop offset="0%" stopColor="#dc2626" stopOpacity="0.45" />
+                    <stop offset="100%" stopColor="#dc2626" stopOpacity="0" />
+                </radialGradient>
+                <filter id="blur_filter" x="-50%" y="-50%" width="200%" height="200%">
+                    <feGaussianBlur stdDeviation="60"/>
+                </filter>
             </defs>
-            <g style={{ animation: 'float1 20s ease-in-out infinite' }}>
-                <ellipse cx="200" cy="500" rx="250" ry="180" fill="url(#rev_grad1)" filter="url(#rev_blur1)" transform="rotate(-30 200 500)"/>
-                <rect x="500" y="100" width="300" height="250" rx="80" fill="url(#rev_grad2)" filter="url(#rev_blur2)" transform="rotate(15 650 225)"/>
-            </g>
-            <g style={{ animation: 'float2 25s ease-in-out infinite' }}>
-                <circle cx="650" cy="450" r="150" fill="url(#rev_grad3)" filter="url(#rev_blur3)" opacity="0.7"/>
-                <ellipse cx="50" cy="150" rx="180" ry="120" fill="var(--color-accent)" filter="url(#rev_blur2)" opacity="0.8"/>
+            {/* Base dark/black layer */}
+            <rect width="800" height="600" fill="#09090b" />
+            
+            {/* Animated Glow Elements */}
+            <g filter="url(#blur_filter)">
+                {/* Yellow glow in the bottom-left */}
+                <circle cx="100" cy="550" r="350" fill="url(#glow_yellow)" style={{ animation: 'floatYellow 22s ease-in-out infinite' }} />
+                
+                {/* Purple/Pink glow in the top-right */}
+                <circle cx="700" cy="80" r="380" fill="url(#glow_purple)" style={{ animation: 'floatPurple 25s ease-in-out infinite' }} />
+                
+                {/* Red glow in the bottom-right */}
+                <circle cx="720" cy="520" r="300" fill="url(#glow_red)" style={{ animation: 'floatRed 20s ease-in-out infinite' }} />
             </g>
         </svg>
     </>
@@ -160,26 +195,23 @@ const OtpInput = ({ value, onChange, onComplete }: OtpInputProps) => {
   const inputsRef = useRef<(HTMLInputElement | null)[]>([]);
   const digits = value.padEnd(6, '').split('').slice(0, 6);
 
-  const handleChange = (index: number, char: string) => {
+  const handleChange = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    const digit = val.slice(-1).replace(/\D/g, '');
+    
     const newDigits = [...digits];
-    // Handle paste
-    if (char.length > 1) {
-      const pasted = char.replace(/\D/g, '').slice(0, 6);
-      const combined = (pasted + '      ').slice(0, 6);
-      onChange(combined.trimEnd());
-      const nextFocus = Math.min(pasted.length, 5);
-      setTimeout(() => inputsRef.current[nextFocus]?.focus(), 0);
-      if (pasted.length === 6) onComplete?.();
-      return;
-    }
-    const digit = char.replace(/\D/g, '');
     newDigits[index] = digit;
-    const newVal = newDigits.join('').replace(/ /g, '');
+    const newVal = newDigits.join('').trimEnd();
+    
     onChange(newVal);
+
     if (digit && index < 5) {
       setTimeout(() => inputsRef.current[index + 1]?.focus(), 0);
     }
-    if (newVal.length === 6) onComplete?.();
+    
+    if (newVal.length === 6) {
+      onComplete?.();
+    }
   };
 
   const handleKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -187,8 +219,23 @@ const OtpInput = ({ value, onChange, onComplete }: OtpInputProps) => {
       if (!digits[index] && index > 0) {
         const newDigits = [...digits];
         newDigits[index - 1] = '';
-        onChange(newDigits.join('').replace(/ /g, ''));
+        const newVal = newDigits.join('').trimEnd();
+        onChange(newVal);
         setTimeout(() => inputsRef.current[index - 1]?.focus(), 0);
+      }
+    }
+  };
+
+  const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    const pastedData = e.clipboardData.getData('text');
+    const pastedClean = pastedData.replace(/\D/g, '').slice(0, 6);
+    if (pastedClean) {
+      onChange(pastedClean);
+      const nextFocusIndex = Math.min(pastedClean.length, 5);
+      setTimeout(() => inputsRef.current[nextFocusIndex]?.focus(), 0);
+      if (pastedClean.length === 6) {
+        onComplete?.();
       }
     }
   };
@@ -196,17 +243,18 @@ const OtpInput = ({ value, onChange, onComplete }: OtpInputProps) => {
   return (
     <div className="flex gap-3 justify-center">
       {Array.from({ length: 6 }, (_, i) => (
-        <div key={i} className="glass-input-wrap">
+        <div key={`otp-input-${i}`} className="glass-input-wrap">
           <div className="glass-input" style={{ width: '44px', height: '52px', borderRadius: '12px', justifyContent: 'center' }}>
             <span className="glass-input-text-area" style={{ borderRadius: '12px' }}></span>
             <input
               ref={(el) => { inputsRef.current[i] = el; }}
               type="text"
               inputMode="numeric"
-              maxLength={6}
+              maxLength={1}
               value={digits[i]?.trim() || ''}
-              onChange={(e) => handleChange(i, e.target.value)}
+              onChange={(e) => handleChange(i, e)}
               onKeyDown={(e) => handleKeyDown(i, e)}
+              onPaste={handlePaste}
               onFocus={(e) => e.target.select()}
               className="relative z-10 w-full h-full bg-transparent text-foreground text-center text-xl font-bold focus:outline-none caret-transparent"
               style={{ borderRadius: '12px' }}
@@ -493,40 +541,109 @@ export const AuthComponent = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [otpCode, setOtpCode] = useState("");
   const [authStep, setAuthStep] = useState<"email" | "password" | "otp">("email");
-  const [modalStatus, setModalStatus] = useState<'closed' | 'loading' | 'error' | 'success'>('closed');
+  const [modalStatus, setModalStatus] = useState<'closed' | 'loading' | 'error' | 'success' | 'otp'>('closed');
   const [modalErrorMessage, setModalErrorMessage] = useState('');
+  const [isLoaderFadingOut, setIsLoaderFadingOut] = useState(false);
   const [showProfileSetup, setShowProfileSetup] = useState(false);
   const [registeredUser, setRegisteredUser] = useState<any>(null);
   const [registeredToken, setRegisteredToken] = useState<string>('');
   const confettiRef = useRef<ConfettiRef>(null);
+  const isSubmittingRef = useRef(false);
+
+  const openOAuthPopup = (url: string) => {
+    const width = 500;
+    const height = 650;
+    const left = window.screenX + (window.outerWidth - width) / 2;
+    const top = window.screenY + (window.outerHeight - height) / 2;
+    
+    const popup = window.open(
+      url,
+      'oauth_popup',
+      `width=${width},height=${height},left=${left},top=${top},status=no,resizable=yes,scrollbars=yes`
+    );
+    
+    if (popup) {
+      popup.focus();
+    }
+  };
 
   const handleGoogleLogin = () => {
     const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1';
-    window.location.href = `${apiBaseUrl}/auth/google`;
+    openOAuthPopup(`${apiBaseUrl}/auth/google`);
   };
 
   const handleAppleLogin = () => {
     const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1';
-    window.location.href = `${apiBaseUrl}/auth/apple`;
+    openOAuthPopup(`${apiBaseUrl}/auth/apple`);
   };
 
+  // Listen for login details from the popup window
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      // Security check: only accept messages from the same origin
+      if (event.origin !== window.location.origin) return;
+
+      if (event.data && event.data.type === 'OAUTH_SUCCESS') {
+        const { token, refreshToken, user, isNewUser } = event.data;
+        try {
+          loginSuccess(user, token, refreshToken);
+          fireSideCanons();
+
+          if (isNewUser) {
+            setRegisteredUser(user);
+            setRegisteredToken(token);
+            setIsSignUp(true);
+            setModalStatus('success');
+          } else {
+            setModalStatus('success');
+            setTimeout(() => {
+              setModalStatus('closed');
+              navigate('/');
+            }, 1500);
+          }
+        } catch (e) {
+          console.error('Failed to complete login from OAuth popup:', e);
+        }
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => {
+      window.removeEventListener('message', handleMessage);
+    };
+  }, [navigate, loginSuccess]);
+
+  // If this window itself is the popup, parse params, message the parent, and close.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const token = params.get('token');
+    const refreshToken = params.get('refreshToken');
     const userRaw = params.get('user');
     const isNewUser = params.get('isNewUser') === 'true';
 
     if (token && userRaw) {
       try {
         const user = JSON.parse(decodeURIComponent(userRaw));
-        loginSuccess(user, token);
+        
+        if (window.opener && window.opener !== window) {
+          window.opener.postMessage(
+            { type: 'OAUTH_SUCCESS', token, refreshToken, user, isNewUser },
+            window.location.origin
+          );
+          window.close();
+          return;
+        }
+
+        // Fallback for direct redirect (non-popup)
+        loginSuccess(user, token, refreshToken || '');
         fireSideCanons();
         window.history.replaceState({}, document.title, window.location.pathname);
         
         if (isNewUser) {
           setRegisteredUser(user);
           setRegisteredToken(token);
-          setShowProfileSetup(true);
+          setIsSignUp(true);
+          setModalStatus('success');
         } else {
           setModalStatus('success');
           setTimeout(() => {
@@ -559,55 +676,73 @@ export const AuthComponent = () => {
   };
 
   const handleSendOtp = async () => {
-    if (!isEmailValid || !isPasswordValid) return;
+    if (!isEmailValid || !isPasswordValid || isSubmittingRef.current) return;
     if (!passwordsMatch) {
       setModalErrorMessage("Şifreler uyuşmuyor!");
       setModalStatus('error');
       return;
     }
+    isSubmittingRef.current = true;
+    setIsLoaderFadingOut(false);
     setModalStatus('loading');
     try {
       await AuthService.sendOtp(email, password);
-      setModalStatus('closed');
-      setAuthStep('otp');
+      // Let the loader fade out first
+      setIsLoaderFadingOut(true);
+      // After it fades out (250ms), change state to OTP to expand the card
+      setTimeout(() => {
+        setModalStatus('otp');
+        setAuthStep('otp');
+        isSubmittingRef.current = false;
+      }, 250);
     } catch (err: any) {
       setModalErrorMessage(err.message || 'E-posta gönderilemedi. Lütfen tekrar deneyin.');
       setModalStatus('error');
+      isSubmittingRef.current = false;
     }
   };
 
   const handleVerifyOtp = async () => {
-    if (otpCode.length < 6) return;
+    if (otpCode.length < 6 || isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     setModalStatus('loading');
     try {
       const response = await AuthService.verifyOtp(email, otpCode);
       setRegisteredUser(response.user);
       setRegisteredToken(response.accessToken);
-      loginSuccess(response.user, response.accessToken);
-      setModalStatus('closed');
+      loginSuccess(response.user, response.accessToken, response.refreshToken);
+      setModalStatus('success');
       fireSideCanons();
-      setTimeout(() => setShowProfileSetup(true), 400);
+      isSubmittingRef.current = false;
     } catch (err: any) {
       setModalErrorMessage(err.message || 'Kod yanlış veya süresi dolmuş. Lütfen tekrar deneyin.');
       setModalStatus('error');
+      isSubmittingRef.current = false;
     }
   };
 
   const handleLoginSubmit = async () => {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     setModalStatus('loading');
     try {
       const response = await AuthService.login({ email, password });
       const loadingStepsCount = signInSteps.length - 1;
       const totalDuration = loadingStepsCount * TEXT_LOOP_INTERVAL * 1000;
       setTimeout(() => {
-        loginSuccess(response.user, response.accessToken);
+        loginSuccess(response.user, response.accessToken, response.refreshToken);
         fireSideCanons();
         setModalStatus('success');
-        setTimeout(() => { navigate('/'); }, 1500);
+        setTimeout(() => {
+          navigate('/');
+          isSubmittingRef.current = false;
+        }, 1500);
       }, totalDuration);
     } catch (err: any) {
+
       setModalErrorMessage(err.message || 'Giriş başarısız. Lütfen bilgilerinizi kontrol edin.');
       setModalStatus('error');
+      isSubmittingRef.current = false;
     }
   };
 
@@ -621,6 +756,12 @@ export const AuthComponent = () => {
   const closeModal = () => {
     setModalStatus('closed');
     setModalErrorMessage('');
+    setIsLoaderFadingOut(false);
+    if (authStep === 'otp') {
+      setAuthStep('email');
+    }
+    setOtpCode('');
+    isSubmittingRef.current = false;
   };
 
   useEffect(() => {
@@ -655,38 +796,21 @@ export const AuthComponent = () => {
     navigate('/');
   };
 
-  const Modal = () => (
-    <AnimatePresence>
-      {modalStatus !== 'closed' && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative bg-card/80 border-4 border-border rounded-2xl p-8 w-full max-w-sm flex flex-col items-center gap-4 mx-2">
-            {(modalStatus === 'error' || modalStatus === 'success') && <button onClick={closeModal} className="absolute top-2 right-2 p-1 text-muted-foreground hover:text-foreground transition-colors"><X className="w-5 h-5" /></button>}
-            {modalStatus === 'error' && <>
-              <AlertCircle className="w-12 h-12 text-destructive" />
-              <p className="text-lg font-medium text-foreground text-center">{modalErrorMessage}</p>
-              <GlassButton onClick={closeModal} size="sm" className="mt-4">Tekrar Dene</GlassButton>
-            </>}
-            {modalStatus === 'loading' &&
-              <TextLoop interval={TEXT_LOOP_INTERVAL} stopOnEnd={true}>
-                {activeSteps.slice(0, -1).map((step, i) =>
-                  <div key={i} className="flex flex-col items-center gap-4">
-                    {step.icon}
-                    <p className="text-lg font-medium text-foreground">{step.message}</p>
-                  </div>
-                )}
-              </TextLoop>
-            }
-            {modalStatus === 'success' &&
-              <div className="flex flex-col items-center gap-4">
-                {activeSteps[activeSteps.length - 1].icon}
-                <p className="text-lg font-medium text-foreground">{activeSteps[activeSteps.length - 1].message}</p>
-              </div>
-            }
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
-  );
+  const getModalDimensions = () => {
+    switch (modalStatus) {
+      case 'otp':
+        return { width: 400, height: 380 };
+      case 'error':
+        return { width: 320, height: 260 };
+      case 'success':
+        return isSignUp ? { width: 350, height: 280 } : { width: 320, height: 260 };
+      case 'loading':
+      default:
+        return { width: 300, height: 200 };
+    }
+  };
+
+  const modalSize = getModalDimensions();
 
   return (
     <div className="bg-background min-h-screen w-screen flex flex-col">
@@ -754,7 +878,190 @@ export const AuthComponent = () => {
       `}</style>
 
       <Confetti ref={confettiRef} manualstart className="fixed top-0 left-0 w-full h-full pointer-events-none z-[999]" />
-      <Modal />
+      
+      {/* Unified Morphing Modal */}
+      <AnimatePresence>
+        {modalStatus !== 'closed' && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, width: 300, height: 200 }}
+              animate={{ 
+                scale: 1, 
+                opacity: 1,
+                width: modalSize.width,
+                height: modalSize.height,
+                padding: modalStatus === 'otp' ? 32 : 24
+              }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              transition={{ 
+                width: { type: "spring", stiffness: 220, damping: 26 },
+                height: { type: "spring", stiffness: 220, damping: 26 },
+                padding: { type: "spring", stiffness: 220, damping: 26 },
+                default: { duration: 0.25 }
+              }}
+              className="relative bg-card/85 border-4 border-border rounded-2xl shadow-2xl backdrop-blur-md flex flex-col items-center justify-center overflow-hidden"
+            >
+              {/* Close Button */}
+              {(modalStatus === 'otp' || modalStatus === 'error' || modalStatus === 'success') && (
+                <button
+                  type="button"
+                  onClick={closeModal}
+                  className="absolute top-3 right-3 p-1.5 text-muted-foreground hover:text-foreground transition-colors rounded-full hover:bg-foreground/5 z-10"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              )}
+
+              {/* LOADER CONTENT */}
+              <motion.div
+                animate={{ 
+                  opacity: (modalStatus === 'loading' && !isLoaderFadingOut) ? 1 : 0,
+                  scale: (modalStatus === 'loading' && !isLoaderFadingOut) ? 1 : 0.9,
+                  filter: (modalStatus === 'loading' && !isLoaderFadingOut) ? "blur(0px)" : "blur(4px)"
+                }}
+                transition={{ duration: 0.25, ease: "easeInOut" }}
+                className={cn(
+                  "absolute inset-0 flex flex-col items-center justify-center p-6 w-full h-full",
+                  (modalStatus === 'loading' && !isLoaderFadingOut) ? "pointer-events-auto" : "pointer-events-none"
+                )}
+              >
+                <TextLoop interval={TEXT_LOOP_INTERVAL} stopOnEnd={true}>
+                  {activeSteps.slice(0, -1).map((step, i) =>
+                    <div key={i} className="flex flex-col items-center gap-4">
+                      {step.icon}
+                      <p className="text-lg font-medium text-foreground">{step.message}</p>
+                    </div>
+                  )}
+                </TextLoop>
+              </motion.div>
+
+              {/* OTP CONTENT */}
+              <motion.div
+                animate={{ 
+                  opacity: modalStatus === 'otp' ? 1 : 0,
+                  y: modalStatus === 'otp' ? 0 : 20,
+                }}
+                transition={{ 
+                  delay: modalStatus === 'otp' ? 0.25 : 0, 
+                  duration: 0.35, 
+                  ease: [0.34, 1.56, 0.64, 1] 
+                }}
+                className={cn(
+                  "w-full flex flex-col items-center gap-6",
+                  modalStatus === 'otp' ? "relative pointer-events-auto" : "absolute pointer-events-none"
+                )}
+              >
+                {/* Header */}
+                <div className="flex flex-col items-center text-center gap-2">
+                  <p className="font-serif font-light text-3xl tracking-tight text-foreground whitespace-nowrap">
+                    Check Email
+                  </p>
+                  <p className="text-xs font-medium text-muted-foreground max-w-[280px]">
+                    We sent a 6-digit code to<br />
+                    <span className="text-foreground font-semibold break-all">{email}</span>
+                  </p>
+                </div>
+
+                {/* OTP Input */}
+                <div className="w-full flex justify-center py-2">
+                  <OtpInput value={otpCode} onChange={setOtpCode} onComplete={handleVerifyOtp} />
+                </div>
+
+                {/* Actions */}
+                <div className="w-full flex flex-col items-center gap-4">
+                  <GlassButton
+                    type="button"
+                    onClick={handleVerifyOtp}
+                    disabled={otpCode.length < 6}
+                    className="w-[180px]"
+                    contentClassName="flex items-center justify-center gap-2 font-semibold text-foreground text-center"
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Doğrula</span>
+                  </GlassButton>
+
+                  <button
+                    type="button"
+                    onClick={handleSendOtp}
+                    className="text-xs font-semibold text-muted-foreground hover:text-foreground underline underline-offset-4 transition-colors"
+                  >
+                    Kodu tekrar gönder
+                  </button>
+                </div>
+              </motion.div>
+
+              {/* ERROR CONTENT */}
+              <AnimatePresence>
+                {modalStatus === 'error' && (
+                  <motion.div
+                    key="error"
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    transition={{ duration: 0.2 }}
+                    className="flex flex-col items-center gap-4 w-full"
+                  >
+                    <AlertCircle className="w-12 h-12 text-destructive" />
+                    <p className="text-lg font-medium text-foreground text-center">{modalErrorMessage}</p>
+                    <GlassButton onClick={closeModal} size="sm" className="mt-4">Tekrar Dene</GlassButton>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* SUCCESS CONTENT */}
+              <AnimatePresence>
+                {modalStatus === 'success' && (
+                  <motion.div
+                    key="success"
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    transition={{ duration: 0.2 }}
+                    className="flex flex-col items-center gap-4 w-full justify-center px-4"
+                  >
+                    {isSignUp ? (
+                      <>
+                        <div className="relative mb-1">
+                          <div className="absolute inset-0 rounded-full bg-green-500/20 blur-xl scale-150 animate-pulse" />
+                          <PartyPopper className="w-16 h-16 text-green-500 relative z-10" />
+                        </div>
+                        <p className="font-serif font-light text-3xl tracking-tight text-foreground text-center">
+                          Kayıt Başarılı!
+                        </p>
+                        <p className="text-xs text-muted-foreground text-center max-w-[280px]">
+                          Hesabınız başarıyla oluşturuldu. Şimdi aramıza katılabilirsiniz.
+                        </p>
+                        <GlassButton
+                          type="button"
+                          onClick={() => {
+                            closeModal();
+                            navigate('/');
+                          }}
+                          className="w-[180px] mt-2"
+                          contentClassName="flex items-center justify-center gap-2 font-semibold text-foreground text-center"
+                        >
+                          <span>Devam Et</span>
+                          <ArrowRight className="w-4 h-4" />
+                        </GlassButton>
+                      </>
+                    ) : (
+                      <>
+                        {activeSteps[activeSteps.length - 1].icon}
+                        <p className="text-lg font-medium text-foreground">{activeSteps[activeSteps.length - 1].message}</p>
+                      </>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Profile Setup Modal */}
       <AnimatePresence>
@@ -800,7 +1107,7 @@ export const AuthComponent = () => {
             )}
 
             {/* ── SIGN-UP: EMAIL STEP ─────────────────────────────── */}
-            {isSignUp && authStep === 'email' && (
+            {isSignUp && (authStep === 'email' || authStep === 'otp') && (
               <motion.div key="signup-email-header" initial={{ y: 6, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }} className="w-full flex flex-col items-center text-center gap-4">
                 <BlurFade delay={0.1} className="w-full">
                   <p className="font-serif font-light text-4xl sm:text-5xl tracking-tight text-foreground">Create Account</p>
@@ -820,21 +1127,6 @@ export const AuthComponent = () => {
                     <span className="text-xs font-semibold text-muted-foreground">OR</span>
                     <hr className="w-full border-border"/>
                   </div>
-                </BlurFade>
-              </motion.div>
-            )}
-
-            {/* ── SIGN-UP: OTP STEP ───────────────────────────────── */}
-            {isSignUp && authStep === 'otp' && (
-              <motion.div key="otp-header" initial={{ y: 6, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }} className="w-full flex flex-col items-center text-center gap-2">
-                <BlurFade delay={0.1} className="w-full">
-                  <p className="font-serif font-light text-4xl tracking-tight text-foreground">Check Email</p>
-                </BlurFade>
-                <BlurFade delay={0.2}>
-                  <p className="text-sm font-medium text-muted-foreground">
-                    We sent a 6-digit code to<br />
-                    <span className="text-foreground font-semibold">{email}</span>
-                  </p>
                 </BlurFade>
               </motion.div>
             )}
@@ -905,7 +1197,7 @@ export const AuthComponent = () => {
           )}
 
           {/* ── SIGN-UP: EMAIL + PASSWORD FORM ─────────────────────── */}
-          {isSignUp && authStep === 'email' && (
+          {isSignUp && (authStep === 'email' || authStep === 'otp') && (
             <form onSubmit={(e) => { e.preventDefault(); handleSendOtp(); }} className="w-[300px] space-y-4">
               {/* Email */}
               <BlurFade delay={0.1} className="w-full">
@@ -1001,49 +1293,8 @@ export const AuthComponent = () => {
             </form>
           )}
 
-          {/* ── SIGN-UP: OTP FORM ────────────────────────────────────── */}
-          {isSignUp && authStep === 'otp' && (
-            <div className="w-[300px] flex flex-col items-center gap-6">
-              <BlurFade delay={0.1} className="w-full flex justify-center">
-                <OtpInput value={otpCode} onChange={setOtpCode} onComplete={handleVerifyOtp} />
-              </BlurFade>
-
-              <BlurFade delay={0.2}>
-                <GlassButton
-                  type="button"
-                  onClick={handleVerifyOtp}
-                  disabled={otpCode.length < 6}
-                  className="w-[180px]"
-                  contentClassName="flex items-center justify-center gap-2 font-semibold text-foreground text-center"
-                >
-                  <CheckCircle2 className="w-5 h-5" />
-                  <span>Doğrula</span>
-                </GlassButton>
-              </BlurFade>
-
-              <BlurFade delay={0.3}>
-                <div className="flex flex-col items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => { setAuthStep('email'); setOtpCode(''); }}
-                    className="flex items-center gap-2 text-sm text-foreground/70 hover:text-foreground transition-colors"
-                  >
-                    <ArrowLeft className="w-4 h-4" /> Geri dön
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleSendOtp}
-                    className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-4 transition-colors"
-                  >
-                    Kodu tekrar gönder
-                  </button>
-                </div>
-              </BlurFade>
-            </div>
-          )}
-
           {/* ── SWITCH MODE BUTTON ───────────────────────────────────── */}
-          {(!isSignUp || authStep === 'email') && (
+          {(!isSignUp || authStep === 'email' || authStep === 'otp') && (
             <BlurFade delay={0.7}>
               <button
                 type="button"

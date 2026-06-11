@@ -17,7 +17,7 @@ docker compose up -d pgadmin
 Tarayıcınızda aşağıdaki adresi açın:
 
 ```
-http://localhost:8080
+http://localhost:8888
 ```
 
 ## 🔐 Giriş Bilgileri
@@ -32,7 +32,7 @@ http://localhost:8080
 ## 📊 PostgreSQL Veritabanını pgAdmin'e Bağlama
 
 ### Adım 1: Giriş Yap
-1. http://localhost:8080 adresine git
+1. http://localhost:8888 adresine git
 2. Email ve Password'u gir
 3. "Login" butonuna tıkla
 
@@ -137,7 +137,7 @@ Giriş bilgilerini değiştirmek için:
    ```
    PGADMIN_DEFAULT_EMAIL=new_email@example.com
    PGADMIN_DEFAULT_PASSWORD=new_secure_password
-   PGADMIN_PORT=8080  # İstersizn port değiştirebilirsin
+   PGADMIN_PORT=8888  # İstediğiniz portu belirleyebilirsiniz
    ```
 3. Kapsayıcıyı rebuild et:
    ```bash
@@ -167,7 +167,7 @@ docker compose exec postgres psql -U gramdit_user -d gramdit
 
 ### Portu değiştirmek istiyorum
 1. `.env` dosyasını aç
-2. `PGADMIN_PORT=8080` satırını değiştir (örn: `PGADMIN_PORT=9000`)
+2. `PGADMIN_PORT=8888` satırını değiştir (örn: `PGADMIN_PORT=9000`)
 3. Docker Compose'u restart et:
    ```bash
    docker compose down pgadmin

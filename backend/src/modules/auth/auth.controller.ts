@@ -7,6 +7,8 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { SendOtpDto } from './dto/send-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
+import { RefreshTokenDto } from './dto/refresh-token.dto';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 
 @Controller('auth')
 export class AuthController {
@@ -25,6 +27,18 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async login(@Body() loginDto: LoginDto) {
     return this.authService.login(loginDto);
+  }
+
+  @Post('refresh')
+  @HttpCode(HttpStatus.OK)
+  async refresh(@Body() refreshTokenDto: RefreshTokenDto) {
+    return this.authService.refresh(refreshTokenDto.refreshToken);
+  }
+
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  async me(@Req() req: any) {
+    return this.authService.getMe(req.user.sub);
   }
 
   @Post('send-otp')
@@ -48,9 +62,9 @@ export class AuthController {
   @Get('google/callback')
   @UseGuards(AuthGuard('google'))
   async googleAuthCallback(@Req() req: any, @Res() res: Response) {
-    const { user, accessToken, isNewUser } = req.user;
+    const { user, accessToken, refreshToken, isNewUser } = req.user;
     const redirectUrl = this.configService.get<string>('FRONTEND_OAUTH_REDIRECT_URL', 'http://localhost:5173/login');
-    const target = `${redirectUrl}?token=${accessToken}&user=${encodeURIComponent(JSON.stringify(user))}${isNewUser ? '&isNewUser=true' : ''}`;
+    const target = `${redirectUrl}?token=${accessToken}&refreshToken=${refreshToken}&user=${encodeURIComponent(JSON.stringify(user))}${isNewUser ? '&isNewUser=true' : ''}`;
     return res.redirect(target);
   }
 
@@ -63,9 +77,11 @@ export class AuthController {
   @Post('apple/callback')
   @UseGuards(AuthGuard('apple'))
   async appleAuthCallback(@Req() req: any, @Res() res: Response) {
-    const { user, accessToken, isNewUser } = req.user;
+    const { user, accessToken, refreshToken, isNewUser } = req.user;
     const redirectUrl = this.configService.get<string>('FRONTEND_OAUTH_REDIRECT_URL', 'http://localhost:5173/login');
-    const target = `${redirectUrl}?token=${accessToken}&user=${encodeURIComponent(JSON.stringify(user))}${isNewUser ? '&isNewUser=true' : ''}`;
+    const target = `${redirectUrl}?token=${accessToken}&refreshToken=${refreshToken}&user=${encodeURIComponent(JSON.stringify(user))}${isNewUser ? '&isNewUser=true' : ''}`;
     return res.redirect(target);
   }
 }
+
+

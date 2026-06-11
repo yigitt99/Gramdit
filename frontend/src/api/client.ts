@@ -46,7 +46,50 @@ class ApiClient {
         }
         return response.data;
       },
-      (error) => {
+      async (error) => {
+        const originalRequest = error.config;
+
+        // Auto-refresh token on 401 Unauthorized
+        if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
+          originalRequest._retry = true;
+          const refreshToken = localStorage.getItem('gramdit_refresh_token');
+
+          if (refreshToken) {
+            try {
+              const baseURL = this.client.defaults.baseURL;
+              const refreshResponse = await axios.post(`${baseURL}/auth/refresh`, {
+                refreshToken,
+              });
+
+
+              const { accessToken, refreshToken: newRefreshToken } = refreshResponse.data;
+
+              // Save new tokens
+              localStorage.setItem('gramdit_token', accessToken);
+              localStorage.setItem('gramdit_refresh_token', newRefreshToken);
+
+              // Retry original request
+              if (originalRequest.headers) {
+                originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+              }
+              return this.client(originalRequest);
+            } catch (refreshError) {
+              // Revoke session if refresh fails
+              localStorage.removeItem('gramdit_token');
+              localStorage.removeItem('gramdit_refresh_token');
+              localStorage.removeItem('gramdit_user');
+              window.location.href = '/login';
+              return Promise.reject(refreshError);
+            }
+          } else {
+            // No refresh token available - direct to login
+            localStorage.removeItem('gramdit_token');
+            localStorage.removeItem('gramdit_refresh_token');
+            localStorage.removeItem('gramdit_user');
+            window.location.href = '/login';
+          }
+        }
+
         const responseData = error.response?.data;
         let errorMessage = 'An error occurred';
 
@@ -69,6 +112,7 @@ class ApiClient {
         return Promise.reject(errorData);
       }
     );
+
   }
 
   async get<T>(url: string, config?: AxiosRequestConfig): Promise<T> {

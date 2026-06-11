@@ -132,6 +132,28 @@ export class AuthService {
 
   // ─── Core auth ────────────────────────────────────────────────────────────
 
+  async generateTokens(user: User) {
+    const payload = { sub: user.id, username: user.username, email: user.email, role: user.role };
+    
+    // Sign Access Token (e.g. 15m expiration)
+    const accessToken = this.jwtService.sign(payload, {
+      secret: this.configService.get<string>('JWT_SECRET'),
+      expiresIn: '15m',
+    });
+
+    // Sign Refresh Token (e.g. 7d expiration)
+    const refreshToken = this.jwtService.sign(payload, {
+      secret: this.configService.get<string>('JWT_REFRESH_SECRET', 'refresh_' + this.configService.get<string>('JWT_SECRET')),
+      expiresIn: '7d',
+    });
+
+    // Store refresh token in Redis (with 7d TTL)
+    const ttl = 7 * 24 * 60 * 60; // 7 days in seconds
+    await this.redisService.set(`refresh_token:${user.id}`, refreshToken, ttl);
+
+    return { accessToken, refreshToken };
+  }
+
   async register(registerDto: RegisterDto) {
     const { username, email, password, fullName } = registerDto;
 
@@ -163,9 +185,7 @@ export class AuthService {
     try {
       const savedUser = await this.userRepository.save(user);
 
-      // Generate JWT for direct login after registration
-      const payload = { sub: savedUser.id, username: savedUser.username, email: savedUser.email, role: savedUser.role };
-      const accessToken = this.jwtService.sign(payload);
+      const tokens = await this.generateTokens(savedUser);
 
       return {
         user: {
@@ -176,7 +196,7 @@ export class AuthService {
           avatarUrl: savedUser.avatarUrl,
           role: savedUser.role,
         },
-        accessToken,
+        ...tokens,
       };
     } catch (error) {
       if (error.code === '23505') {
@@ -203,8 +223,7 @@ export class AuthService {
       throw new UnauthorizedException('User account is deactivated');
     }
 
-    const payload = { sub: user.id, username: user.username, email: user.email, role: user.role };
-    const accessToken = this.jwtService.sign(payload);
+    const tokens = await this.generateTokens(user);
 
     return {
       user: {
@@ -215,7 +234,43 @@ export class AuthService {
         avatarUrl: user.avatarUrl,
         role: user.role,
       },
-      accessToken,
+      ...tokens,
+    };
+  }
+
+  async refresh(refreshToken: string) {
+    try {
+      const secret = this.configService.get<string>('JWT_REFRESH_SECRET', 'refresh_' + this.configService.get<string>('JWT_SECRET'));
+      const payload = await this.jwtService.verifyAsync(refreshToken, { secret });
+      
+      const user = await this.userRepository.findOne({ where: { id: payload.sub, isActive: true } });
+      if (!user) {
+        throw new UnauthorizedException('User is inactive or does not exist');
+      }
+
+      const storedToken = await this.redisService.get(`refresh_token:${user.id}`);
+      if (!storedToken || storedToken !== refreshToken) {
+        throw new UnauthorizedException('Invalid or expired refresh token');
+      }
+
+      return this.generateTokens(user);
+    } catch (error) {
+      throw new UnauthorizedException('Invalid or expired refresh token');
+    }
+  }
+
+  async getMe(userId: string) {
+    const user = await this.userRepository.findOne({ where: { id: userId, isActive: true } });
+    if (!user) {
+      throw new UnauthorizedException('User not found or inactive');
+    }
+    return {
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      fullName: user.fullName,
+      avatarUrl: user.avatarUrl,
+      role: user.role,
     };
   }
 
@@ -253,8 +308,7 @@ export class AuthService {
       throw new UnauthorizedException('User account is deactivated');
     }
 
-    const payload = { sub: user.id, username: user.username, email: user.email, role: user.role };
-    const accessToken = this.jwtService.sign(payload);
+    const tokens = await this.generateTokens(user);
 
     return {
       user: {
@@ -265,7 +319,7 @@ export class AuthService {
         avatarUrl: user.avatarUrl,
         role: user.role,
       },
-      accessToken,
+      ...tokens,
       isNewUser,
     };
   }

@@ -1,5 +1,5 @@
 import apiClient from '../api/client';
-import { LoginCredentials, RegisterData, AuthResponse } from '../types/auth';
+import { LoginCredentials, RegisterData, AuthResponse, User } from '../types/auth';
 
 export interface SendOtpResponse {
   message: string;
@@ -27,6 +27,11 @@ const AuthService = {
   async verifyOtp(email: string, code: string): Promise<AuthResponse> {
     return apiClient.post<AuthResponse>('/auth/verify-otp', { email, code });
   },
+
+  async getMe(): Promise<User> {
+    return apiClient.get<User>('/auth/me');
+  },
 };
 
 export default AuthService;
+

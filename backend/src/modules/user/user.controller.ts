@@ -3,6 +3,8 @@ import {
   Controller,
   Patch,
   Post,
+  Get,
+  Query,
   Req,
   UnauthorizedException,
   HttpCode,
@@ -55,6 +57,12 @@ export class UserController {
   async updateProfile(@Req() req: Request, @Body() dto: UpdateProfileDto) {
     const userId = this.extractUserId(req);
     return this.userService.updateProfile(userId, dto);
+  }
+
+  @Get('')
+  @HttpCode(HttpStatus.OK)
+  async listUsers(@Query('search') search?: string) {
+    return this.userService.listUsers(search);
   }
 
   @Post('avatar')
