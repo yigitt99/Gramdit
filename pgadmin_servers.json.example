@@ -1,0 +1,16 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "Gramdit Database",
+      "Group": "Servers",
+      "Host": "postgres",
+      "Port": 5432,
+      "MaintenanceDB": "gramdit",
+      "Username": "your_db_username",
+      "Password": "your_secure_db_password",
+      "SSLMode": "prefer",
+      "Shared": false,
+      "Enabled": true
+    }
+  }
+}

@@ -1,6 +1,7 @@
 import { Routes, Route } from 'react-router-dom';
 import { Suspense, lazy } from 'react';
 import HomePage from './pages/HomePage';
+import { WebGLShader } from './components/ui/web-gl-shader';
 
 // Gelecekte sayfa eklerken TypeScript hata vermesin diye lazy kullanımını örnek olarak açık bırakıyoruz
 // const DashboardPage = lazy(() => import('./pages/DashboardPage'));
@@ -8,14 +9,17 @@ console.log(typeof lazy); // TypeScript'in "tanımlandı ama kullanılmadı" kur
 
 function App() {
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading...</div>}>
-        <Routes>
-          <Route path="/" element={<HomePage />} />
-          {/* Gelecekte buraya yeni rotalar ekleyebilirsin */}
-        </Routes>
-      </Suspense>
-    </div>
+    <>
+      <WebGLShader />
+      <div className="min-h-screen bg-transparent relative z-0">
+        <Suspense fallback={<div className="flex items-center justify-center min-h-screen text-white">Loading...</div>}>
+          <Routes>
+            <Route path="/" element={<HomePage />} />
+            {/* Gelecekte buraya yeni rotalar ekleyebilirsin */}
+          </Routes>
+        </Suspense>
+      </div>
+    </>
   );
 }
 

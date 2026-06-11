@@ -1,5 +1,5 @@
-# Build stage
-FROM node:20-alpine AS builder
+# Development stage
+FROM node:20-alpine
 
 WORKDIR /app
 
@@ -12,23 +12,10 @@ RUN npm install
 # Copy source code
 COPY . .
 
-# Build application
-RUN npm run build
-
-# Production stage
-FROM node:20-alpine
-
-WORKDIR /app
-
-# Install serve to run the built app
-RUN npm install -g serve
-
-# Copy built assets from builder stage
-COPY --from=builder /app/dist ./dist
-
 # Expose port
 EXPOSE 5173
 
-# Start the application with serve
-# Serve on all interfaces and use SPA fallback
-CMD ["serve", "-s", "dist", "-l", "5173", "--no-clipboard", "--single"]
+# Start Vite dev server with HMR support
+# --host 0.0.0.0 allows connections from outside container
+# --port 5173 explicitly set port
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5173"]

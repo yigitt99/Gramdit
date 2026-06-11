@@ -1,4 +1,29 @@
 # ============================================
+# SECURITY: SENSITIVE INFORMATION (NEVER COMMIT)
+# ============================================
+# Environment variables with credentials
+.env
+.env.local
+.env.*.local
+.env.development.local
+.env.production.local
+.env.test.local
+*.env
+backend/.env
+frontend/.env
+
+# pgAdmin configuration with credentials
+pgadmin_servers.json
+
+# API Keys and secrets
+.api
+.secrets/
+secrets/
+*.key
+*.pem
+*.secret
+
+# ============================================
 # Dependencies 
 # ============================================
 node_modules/
@@ -11,20 +36,7 @@ yarn.lock
 pnpm-lock.yaml
 
 # ============================================
-# Environment Variables (SENSITIVE)
-# ============================================
-.env
-.env.local
-.env.development.local
-.env.production.local
-.env.test.local
-.env.*.local
-*.env
-backend/.env
-frontend/.env
-
-# ============================================
-# Build Outputs (Gereksiz Kalıntılar)
+# Build Outputs
 # ============================================
 dist/
 backend/dist/
@@ -70,7 +82,7 @@ test-results/
 junit.xml
 
 # ============================================
-# Logs (SENSITIVE)
+# Logs
 # ============================================
 logs/
 *.log
@@ -85,7 +97,7 @@ pids/
 *.pid.lock
 
 # ============================================
-# Database Files (SENSITIVE)
+# Database Files
 # ============================================
 *.sqlite
 *.sqlite3
@@ -94,11 +106,10 @@ pids/
 database.yml
 
 # ============================================
-# Docker configuration
+# Docker & Containerization
 # ============================================
 .docker/
-# NOT: Dockerfile ve .dockerignore talimatları GitHub'a gitmeli, 
-# gerçek veriler/şifreler gitmemeli. O yüzden o satırları kaldırdık.
+docker-compose.override.yml
 
 # ============================================
 # OS & System Files
@@ -110,17 +121,17 @@ Desktop.ini
 .Trashes
 
 # ============================================
-# AWS & Cloud (SENSITIVE)
+# AWS & Cloud (CREDENTIALS)
 # ============================================
 .aws/credentials
 .aws/config
 *.pem
-*.key
 *.pfx
 *.p8
+*.json.key
 
 # ============================================
-# SSL/TLS Certificates (SENSITIVE)
+# SSL/TLS Certificates
 # ============================================
 *.crt
 *.cert
@@ -128,27 +139,32 @@ Desktop.ini
 *.p12
 
 # ============================================
-# Local Development Scripts
+# Development & Temporary Files
 # ============================================
 .local/
 .tmp/
 temp/
+.cache/
+.next/cache/
+dist-ssr/
 
 # ============================================
-# Redis, PostgreSQL Local Data 
+# Python Virtual Environments
+# ============================================
+*.egg-info/
+.pytest_cache/
+.venv/
+env/
+venv/
+
+# ============================================
+# Local Docker Data
 # ============================================
 postgres_data/
 redis_data/
 pgadmin_lib/
 
 # ============================================
-# Runtime & Temporary
+# IDE Workspace
 # ============================================
-.cache/
-.next/cache/
-dist-ssr/
-*.egg-info/
-.pytest_cache/
-.venv/
-env/
-venv/
+.vscode/workspace.code-workspace
