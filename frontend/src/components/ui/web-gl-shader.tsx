@@ -50,27 +50,34 @@ export function WebGLShader() {
         // Normalize coordinates
         vec2 p = (gl_FragCoord.xy * 2.0 - resolution) / min(resolution.x, resolution.y);
         
-        // Chromatic aberration distortion
+        // Chromatic aberration coordinates
         float d = length(p) * distortion;
-        float rx = p.x * (1.0 + d);
+        float rx = p.x + d * 0.1;
         float gx = p.x;
-        float bx = p.x * (1.0 - d);
+        float bx = p.x - d * 0.1;
         
-        // Create elegant light beams with smooth falloff
-        float r = 0.05 / abs(p.y + sin((rx + time) * xScale) * yScale);
-        float g = 0.05 / abs(p.y + sin((gx + time) * xScale) * yScale);
-        float b = 0.05 / abs(p.y + sin((bx + time) * xScale) * yScale);
+        // Dynamic U-shaped cosmic arc equations for Red, Green, and Blue
+        float waveR = sin((rx + time * 0.2) * 1.1) * 0.06;
+        float waveG = sin((gx + time * 0.2) * 1.1) * 0.06;
+        float waveB = sin((bx + time * 0.2) * 1.1) * 0.06;
         
-        // Apply tone mapping for premium look
+        float curveR = p.y - (rx * rx * 0.45) + 0.3 - waveR;
+        float curveG = p.y - (gx * gx * 0.45) + 0.3 - waveG;
+        float curveB = p.y - (bx * bx * 0.45) + 0.3 - waveB;
+        
+        // Bright glowing cores with high falloff
+        float r = 0.04 / abs(curveR);
+        float g = 0.04 / abs(curveG);
+        float b = 0.04 / abs(curveB);
+        
         vec3 color = vec3(r, g, b);
         
         // Add vignette for depth
-        float vignette = 1.0 - length(p * 0.3);
+        float vignette = 1.0 - length(p * 0.25);
         color *= vignette;
         
-        // Gramdit color grading - enhance orange/white channels
-        color.r = mix(color.r, color.r * 1.2, 0.5);
-        color.g = mix(color.g, color.g * 0.95, 0.3);
+        // Boost light peaks for premium HDR look
+        color = pow(color, vec3(1.1));
         
         gl_FragColor = vec4(color, 1.0);
       }

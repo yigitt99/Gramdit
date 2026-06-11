@@ -13,10 +13,10 @@ export default function HomePage() {
           </p>
           <div className="my-8 flex items-center justify-center gap-1">
             <span className="relative flex h-3 w-3 items-center justify-center">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-orange-500 opacity-75"></span>
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-orange-500"></span>
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-zinc-400 opacity-75"></span>
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-zinc-400"></span>
             </span>
-            <p className="text-xs text-orange-500">Ready for Premium Grammar Checking</p>
+            <p className="text-xs text-zinc-400">Ready for Premium Grammar Checking</p>
           </div>
           <div className="flex justify-center gap-4">
             <LiquidButton className="text-white border rounded-full" size="xl">

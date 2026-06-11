@@ -1,6 +1,7 @@
 import { Routes, Route } from 'react-router-dom';
 import { Suspense, lazy } from 'react';
 import HomePage from './pages/HomePage';
+import LoginPage from './pages/LoginPage';
 import { WebGLShader } from './components/ui/web-gl-shader';
 
 // Gelecekte sayfa eklerken TypeScript hata vermesin diye lazy kullanımını örnek olarak açık bırakıyoruz
@@ -15,7 +16,7 @@ function App() {
         <Suspense fallback={<div className="flex items-center justify-center min-h-screen text-white">Loading...</div>}>
           <Routes>
             <Route path="/" element={<HomePage />} />
-            {/* Gelecekte buraya yeni rotalar ekleyebilirsin */}
+            <Route path="/login" element={<LoginPage />} />
           </Routes>
         </Suspense>
       </div>

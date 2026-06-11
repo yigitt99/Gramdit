@@ -6,6 +6,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { UserRole } from '../enums/user-role.enum';
 
 @Entity('users')
 @Index('IDX_users_username', ['username'], { unique: true })
@@ -59,6 +60,13 @@ export class User {
     name: 'avatar_url',
   })
   avatarUrl: string | null;
+
+  @Column({
+    type: 'enum',
+    enum: UserRole,
+    default: UserRole.USER,
+  })
+  role: UserRole;
 
   @Column({
     type: 'boolean',

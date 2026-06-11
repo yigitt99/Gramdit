@@ -15,15 +15,17 @@ if (missingEnvVars.length > 0) {
   );
 }
 
+const isTypeScript = typeof __filename !== 'undefined' && __filename.endsWith('.ts');
+
 export const AppDataSource = new DataSource({
   type: 'postgres',
   host: process.env.DB_HOST,
-  port: parseInt(process.env.DB_PORT, 10),
+  port: parseInt(process.env.DB_PORT || '5432', 10),
   username: process.env.DB_USERNAME,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_DATABASE,
-  entities: [path.join(__dirname, '../**/*.entity.ts'), path.join(__dirname, '../**/*.entity.js')],
-  migrations: [path.join(__dirname, '/migrations/*.ts'), path.join(__dirname, '/migrations/*.js')],
+  entities: isTypeScript ? ['src/**/*.entity.ts'] : ['dist/**/*.entity.js'],
+  migrations: isTypeScript ? ['src/database/migrations/*.ts'] : ['dist/database/migrations/*.js'],
   synchronize: false,
   logging: process.env.NODE_ENV === 'development',
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,

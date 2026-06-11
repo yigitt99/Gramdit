@@ -1,5 +1,5 @@
 import { plainToClass } from 'class-transformer';
-import { IsEnum, IsNumber, IsString, validateSync } from 'class-validator';
+import { IsEnum, IsNumber, IsOptional, IsString, validateSync } from 'class-validator';
 
 enum Environment {
   Development = 'development',
@@ -43,6 +43,56 @@ class EnvironmentVariables {
 
   @IsString()
   CORS_ORIGIN: string;
+
+  @IsString()
+  JWT_SECRET: string;
+
+  @IsString()
+  JWT_EXPIRATION: string;
+
+  @IsOptional()
+  @IsString()
+  SMTP_USER?: string;
+
+  @IsOptional()
+  @IsString()
+  SMTP_PASS?: string;
+
+  @IsOptional()
+  @IsString()
+  GOOGLE_CLIENT_ID?: string;
+
+  @IsOptional()
+  @IsString()
+  GOOGLE_CLIENT_SECRET?: string;
+
+  @IsOptional()
+  @IsString()
+  GOOGLE_CALLBACK_URL?: string;
+
+  @IsOptional()
+  @IsString()
+  APPLE_CLIENT_ID?: string;
+
+  @IsOptional()
+  @IsString()
+  APPLE_TEAM_ID?: string;
+
+  @IsOptional()
+  @IsString()
+  APPLE_KEY_ID?: string;
+
+  @IsOptional()
+  @IsString()
+  APPLE_PRIVATE_KEY_PATH?: string;
+
+  @IsOptional()
+  @IsString()
+  APPLE_CALLBACK_URL?: string;
+
+  @IsOptional()
+  @IsString()
+  FRONTEND_OAUTH_REDIRECT_URL?: string;
 }
 
 export function validateEnv(config: Record<string, unknown>) {

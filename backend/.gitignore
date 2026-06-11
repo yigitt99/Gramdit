@@ -83,3 +83,6 @@ dist/
 node_modules/
 test/
 jest-junit-results.xml
+
+# User Uploads
+uploads/

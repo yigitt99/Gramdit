@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Outfit:wght@300;400;500;600;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -12,17 +14,50 @@
 :root {
   --color-dark: #0a0a0a;
   --color-dark-gray: #111111;
-  --color-orange-primary: #ff7a00;
+  --color-silver-primary: #e4e4e7;
   --color-white: #ffffff;
+
+  --background: #000000;
+  --foreground: #ffffff;
+  --card: #09090b;
+  --card-foreground: #ffffff;
+  --popover: #09090b;
+  --popover-foreground: #ffffff;
+  --primary: #ffffff;
+  --primary-foreground: #09090b;
+  --secondary: #27272a;
+  --secondary-foreground: #ffffff;
+  --muted: #27272a;
+  --muted-foreground: #a1a1aa;
+  --accent: #27272a;
+  --accent-foreground: #ffffff;
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+  --border: #27272a;
+  --input: #27272a;
+  --ring: #d4d4d8;
+
+  --color-primary: #ffffff;
+  --color-secondary: #27272a;
+  --color-accent: #3f3f46;
+  --color-destructive: #ef4444;
+  --color-chart-1: #ffffff;
+  --color-chart-2: #e4e4e7;
+  --color-chart-3: #a1a1aa;
+  --color-chart-4: #52525b;
+  --color-chart-5: #27272a;
+}
+
+/* Custom classes for typography */
+.custom-font-serif {
+  font-family: 'DM Serif Display', 'Playfair Display', Georgia, serif;
 }
 
 /* Base styles for premium look */
 body {
   background-color: var(--color-dark);
   color: var(--color-white);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -35,10 +70,10 @@ code {
 /* Premium button styles */
 @layer components {
   .btn-primary {
-    @apply px-8 py-3 bg-orange-600 hover:bg-orange-700 text-white font-semibold rounded-lg transition-all duration-200 drop-shadow-lg;
+    @apply px-8 py-3 bg-white hover:bg-zinc-200 text-zinc-950 font-semibold rounded-lg transition-all duration-200 drop-shadow-lg;
   }
 
   .btn-secondary {
-    @apply px-8 py-3 bg-transparent border-2 border-orange-600 hover:border-orange-700 text-orange-600 hover:text-orange-700 font-semibold rounded-lg transition-all duration-200;
+    @apply px-8 py-3 bg-transparent border border-white/20 hover:border-white/40 text-white hover:bg-white/5 font-semibold rounded-lg transition-all duration-200;
   }
 }

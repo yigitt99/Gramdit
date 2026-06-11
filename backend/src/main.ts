@@ -1,6 +1,9 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { NestExpressApplication } from '@nestjs/platform-express';
+import { join } from 'path';
+import { existsSync, mkdirSync } from 'fs';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
@@ -9,11 +12,16 @@ async function bootstrap() {
   const logger = new Logger('Bootstrap');
 
   try {
-    const app = await NestFactory.create(AppModule, {
+    const app = await NestFactory.create<NestExpressApplication>(AppModule, {
       logger: ['error', 'warn', 'log'],
     });
 
     const configService = app.get(ConfigService);
+
+    // Serve uploaded files statically
+    const uploadsDir = join(process.cwd(), 'uploads');
+    if (!existsSync(uploadsDir)) mkdirSync(uploadsDir, { recursive: true });
+    app.useStaticAssets(uploadsDir, { prefix: '/uploads' });
 
     // Global prefix
     const apiPrefix = configService.get<string>('API_PREFIX', '/api/v1');

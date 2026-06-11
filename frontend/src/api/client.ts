@@ -23,6 +23,10 @@ class ApiClient {
     // Request interceptor
     this.client.interceptors.request.use(
       (config) => {
+        const token = localStorage.getItem('gramdit_token');
+        if (token && config.headers) {
+          config.headers.Authorization = `Bearer ${token}`;
+        }
         if (import.meta.env.DEV) {
           console.log(`→ ${config.method?.toUpperCase()} ${config.url}`);
         }
@@ -43,10 +47,23 @@ class ApiClient {
         return response.data;
       },
       (error) => {
+        const responseData = error.response?.data;
+        let errorMessage = 'An error occurred';
+
+        if (responseData) {
+          if (Array.isArray(responseData.message)) {
+            errorMessage = responseData.message[0]; // Take first validation error
+          } else if (typeof responseData.message === 'string') {
+            errorMessage = responseData.message;
+          } else if (responseData.error?.message) {
+            errorMessage = responseData.error.message;
+          }
+        }
+
         const errorData = {
           status: error.response?.status || 0,
-          message: error.response?.data?.error?.message || 'An error occurred',
-          code: error.response?.data?.error?.code || 'UNKNOWN_ERROR',
+          message: errorMessage,
+          code: responseData?.error?.code || 'UNKNOWN_ERROR',
         };
         console.error('Response error:', errorData);
         return Promise.reject(errorData);
