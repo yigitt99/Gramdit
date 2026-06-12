@@ -5,11 +5,12 @@ import { CommunityMember } from './entities/community-member.entity';
 import { User } from '../user/entities/user.entity';
 import { CommunityService } from './community.service';
 import { CommunityController } from './community.controller';
+import { CommunityBan } from './entities/community-ban.entity';
 import { AuthModule } from '../auth/auth.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Community, CommunityMember, User]),
+    TypeOrmModule.forFeature([Community, CommunityMember, User, CommunityBan]),
     AuthModule,
   ],
   controllers: [CommunityController],

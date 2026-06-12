@@ -80,6 +80,8 @@ export class UserController {
       avatarUrl: user.avatarUrl,
       bannerUrl: user.bannerUrl,
       createdAt: user.createdAt,
+      followerCount: user.followerCount,
+      followingCount: user.followingCount,
     };
   }
 
@@ -101,6 +103,8 @@ export class UserController {
       avatarUrl: user.avatarUrl,
       bannerUrl: user.bannerUrl,
       createdAt: user.createdAt,
+      followerCount: user.followerCount,
+      followingCount: user.followingCount,
     };
   }
 

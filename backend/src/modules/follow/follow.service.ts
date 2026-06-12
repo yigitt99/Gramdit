@@ -3,6 +3,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Follow } from './entities/follow.entity';
 import { User } from '../user/entities/user.entity';
+import { NotificationService } from '../notification/notification.service';
+import { NotificationType } from '../notification/enums/notification-type.enum';
 
 @Injectable()
 export class FollowService {
@@ -11,9 +13,11 @@ export class FollowService {
     private readonly followRepository: Repository<Follow>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    private readonly notificationService: NotificationService,
   ) {}
 
-  async follow(followingId: string, followerId: string): Promise<Follow> {
+  /** Kullanıcıyı takip et */
+  async follow(followingId: string, followerId: string): Promise<{ success: boolean; isFollowing: boolean }> {
     if (followerId === followingId) {
       throw new BadRequestException('Kendinizi takip edemezsiniz');
     }
@@ -31,18 +35,22 @@ export class FollowService {
       throw new BadRequestException('Bu kullanıcıyı zaten takip ediyorsunuz');
     }
 
-    const newFollow = this.followRepository.create({
-      followerId,
-      followingId,
-    });
-
-    const saved = await this.followRepository.save(newFollow);
+    const newFollow = this.followRepository.create({ followerId, followingId });
+    await this.followRepository.save(newFollow);
     await this.updateCounts(followerId, followingId);
 
-    return saved;
+    // Bildirim oluştur (takip edilen kişiye)
+    await this.notificationService.create({
+      recipientId: followingId,
+      senderId: followerId,
+      type: NotificationType.FOLLOW,
+    });
+
+    return { success: true, isFollowing: true };
   }
 
-  async unfollow(followingId: string, followerId: string): Promise<{ success: boolean }> {
+  /** Takibi bırak */
+  async unfollow(followingId: string, followerId: string): Promise<{ success: boolean; isFollowing: boolean }> {
     const targetUser = await this.userRepository.findOne({ where: { id: followingId } });
     if (!targetUser) {
       throw new NotFoundException('Kullanıcı bulunamadı');
@@ -59,58 +67,80 @@ export class FollowService {
     await this.followRepository.remove(followRecord);
     await this.updateCounts(followerId, followingId);
 
-    return { success: true };
+    return { success: true, isFollowing: false };
   }
 
-  async getFollowers(userId: string): Promise<User[]> {
+  /** Takipçi listesi */
+  async getFollowers(userId: string): Promise<any[]> {
     const user = await this.userRepository.findOne({ where: { id: userId } });
-    if (!user) {
-      throw new NotFoundException('Kullanıcı bulunamadı');
-    }
+    if (!user) throw new NotFoundException('Kullanıcı bulunamadı');
 
     const list = await this.followRepository.find({
       where: { followingId: userId },
       relations: ['follower'],
-      select: {
-        id: true,
-        follower: {
-          id: true,
-          username: true,
-          avatarUrl: true,
-        },
-      },
     });
 
-    return list.map(item => item.follower);
+    return list.map(item => ({
+      id: item.follower.id,
+      username: item.follower.username,
+      fullName: item.follower.fullName,
+      avatarUrl: item.follower.avatarUrl,
+      bio: item.follower.bio,
+      followerCount: item.follower.followerCount,
+      followingCount: item.follower.followingCount,
+    }));
   }
 
-  async getFollowing(userId: string): Promise<User[]> {
+  /** Takip edilenler listesi */
+  async getFollowing(userId: string): Promise<any[]> {
     const user = await this.userRepository.findOne({ where: { id: userId } });
-    if (!user) {
-      throw new NotFoundException('Kullanıcı bulunamadı');
-    }
+    if (!user) throw new NotFoundException('Kullanıcı bulunamadı');
 
     const list = await this.followRepository.find({
       where: { followerId: userId },
       relations: ['following'],
-      select: {
-        id: true,
-        following: {
-          id: true,
-          username: true,
-          avatarUrl: true,
-        },
-      },
     });
 
-    return list.map(item => item.following);
+    return list.map(item => ({
+      id: item.following.id,
+      username: item.following.username,
+      fullName: item.following.fullName,
+      avatarUrl: item.following.avatarUrl,
+      bio: item.following.bio,
+      followerCount: item.following.followerCount,
+      followingCount: item.following.followingCount,
+    }));
+  }
+
+  /** Takip durumu */
+  async getFollowStatus(
+    currentUserId: string,
+    targetUserId: string,
+  ): Promise<{ isFollowing: boolean; isFollowedBy: boolean }> {
+    const [isFollowing, isFollowedBy] = await Promise.all([
+      this.followRepository.findOne({
+        where: { followerId: currentUserId, followingId: targetUserId },
+      }),
+      this.followRepository.findOne({
+        where: { followerId: targetUserId, followingId: currentUserId },
+      }),
+    ]);
+
+    return {
+      isFollowing: !!isFollowing,
+      isFollowedBy: !!isFollowedBy,
+    };
   }
 
   private async updateCounts(followerId: string, followingId: string) {
-    const followerCount = await this.followRepository.count({ where: { followingId } });
-    await this.userRepository.update(followingId, { followerCount });
+    const [followerCount, followingCount] = await Promise.all([
+      this.followRepository.count({ where: { followingId } }),
+      this.followRepository.count({ where: { followerId } }),
+    ]);
 
-    const followingCount = await this.followRepository.count({ where: { followerId } });
-    await this.userRepository.update(followerId, { followingCount });
+    await Promise.all([
+      this.userRepository.update(followingId, { followerCount }),
+      this.userRepository.update(followerId, { followingCount }),
+    ]);
   }
 }

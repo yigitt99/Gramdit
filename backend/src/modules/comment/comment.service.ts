@@ -1,9 +1,14 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, IsNull } from 'typeorm';
 import { Comment } from './entities/comment.entity';
 import { Post } from '../post/entities/post.entity';
+import { CommunityMember } from '../community/entities/community-member.entity';
+import { CommunityBan } from '../community/entities/community-ban.entity';
 import { CreateCommentDto } from './dto/create-comment.dto';
+import { NotificationService } from '../notification/notification.service';
+import { NotificationType } from '../notification/enums/notification-type.enum';
+import { CommunityRole } from '../community/enums/community-role.enum';
 
 @Injectable()
 export class CommentService {
@@ -12,12 +17,26 @@ export class CommentService {
     private readonly commentRepository: Repository<Comment>,
     @InjectRepository(Post)
     private readonly postRepository: Repository<Post>,
+    @InjectRepository(CommunityMember)
+    private readonly communityMemberRepository: Repository<CommunityMember>,
+    @InjectRepository(CommunityBan)
+    private readonly communityBanRepository: Repository<CommunityBan>,
+    private readonly notificationService: NotificationService,
   ) {}
 
   async create(postId: string, createCommentDto: CreateCommentDto, authorId: string): Promise<Comment> {
     const post = await this.postRepository.findOne({ where: { id: postId } });
     if (!post) {
       throw new NotFoundException(`Post with ID "${postId}" not found`);
+    }
+
+    if (post.communityId) {
+      const isBanned = await this.communityBanRepository.findOne({
+        where: { communityId: post.communityId, userId: authorId },
+      });
+      if (isBanned) {
+        throw new ForbiddenException('You are banned from commenting in this community');
+      }
     }
 
     let parentComment: Comment | null = null;
@@ -47,6 +66,25 @@ export class CommentService {
 
     // Increment comment count on the post
     await this.postRepository.increment({ id: postId }, 'commentCount', 1);
+
+    // Bildirim oluştur
+    if (parentComment) {
+      // Yorum yanıtı → parent yorumun yazarına COMMENT_REPLY bildirimi
+      await this.notificationService.create({
+        recipientId: parentComment.authorId,
+        senderId: authorId,
+        type: NotificationType.COMMENT_REPLY,
+        referenceId: postId,
+      });
+    } else {
+      // Normal yorum → post yazarına COMMENT bildirimi
+      await this.notificationService.create({
+        recipientId: post.authorId,
+        senderId: authorId,
+        type: NotificationType.COMMENT,
+        referenceId: postId,
+      });
+    }
 
     // Fetch the saved comment with author relation populated for response
     return this.commentRepository.findOne({
@@ -78,9 +116,6 @@ export class CommentService {
       throw new NotFoundException(`Post with ID "${postId}" not found`);
     }
 
-    // Fetch comments for this post.
-    // To support nesting, we fetch root comments (parentCommentId is null)
-    // and load replies recursively up to a reasonable level using relations.
     return this.commentRepository.find({
       where: { postId, parentCommentId: IsNull() },
       relations: [
@@ -211,5 +246,36 @@ export class CommentService {
     }
 
     return comment;
+  }
+
+  async delete(id: string, userId: string): Promise<void> {
+    const comment = await this.commentRepository.findOne({
+      where: { id },
+      relations: { post: true },
+    });
+
+    if (!comment) {
+      throw new NotFoundException('Comment not found');
+    }
+
+    if (comment.authorId === userId || comment.post.authorId === userId) {
+      await this.commentRepository.remove(comment);
+      await this.postRepository.decrement({ id: comment.postId }, 'commentCount', 1);
+      return;
+    }
+
+    if (comment.post.communityId) {
+      const member = await this.communityMemberRepository.findOne({
+        where: { communityId: comment.post.communityId, userId },
+      });
+
+      if (member && (member.role === CommunityRole.FOUNDER || member.role === CommunityRole.MODERATOR)) {
+        await this.commentRepository.remove(comment);
+        await this.postRepository.decrement({ id: comment.postId }, 'commentCount', 1);
+        return;
+      }
+    }
+
+    throw new ForbiddenException('You do not have permission to delete this comment');
   }
 }

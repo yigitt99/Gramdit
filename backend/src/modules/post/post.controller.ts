@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, Param, Req, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Get, Delete, Body, Param, Req, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
 import { Request } from 'express';
 import { PostService } from './post.service';
 import { CreatePostDto } from './dto/create-post.dto';
@@ -32,5 +32,13 @@ export class PostController {
   @HttpCode(HttpStatus.OK)
   async findCommunityPosts(@Param('slug') slug: string) {
     return this.postService.findCommunityPosts(slug);
+  }
+
+  @Delete('posts/:id')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async delete(@Param('id') id: string, @Req() req: Request) {
+    const userId = (req as any).user.sub;
+    await this.postService.delete(id, userId);
   }
 }

@@ -1,9 +1,10 @@
-import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
+import { Injectable, ConflictException, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Community } from './entities/community.entity';
 import { CommunityMember } from './entities/community-member.entity';
 import { User } from '../user/entities/user.entity';
+import { CommunityBan } from './entities/community-ban.entity';
 import { CreateCommunityDto } from './dto/create-community.dto';
 import { CommunityRole } from './enums/community-role.enum';
 
@@ -16,6 +17,8 @@ export class CommunityService {
     private readonly communityMemberRepository: Repository<CommunityMember>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    @InjectRepository(CommunityBan)
+    private readonly communityBanRepository: Repository<CommunityBan>,
   ) {}
 
   private slugify(text: string): string {
@@ -198,5 +201,233 @@ export class CommunityService {
     }
 
     return member;
+  }
+
+  async isBanned(communityId: string, userId: string): Promise<boolean> {
+    const ban = await this.communityBanRepository.findOne({
+      where: { communityId, userId },
+    });
+    return !!ban;
+  }
+
+  async getBans(communityId: string, requesterId: string): Promise<CommunityBan[]> {
+    const requester = await this.communityMemberRepository.findOne({
+      where: { communityId, userId: requesterId },
+    });
+
+    if (!requester || (requester.role !== CommunityRole.FOUNDER && requester.role !== CommunityRole.MODERATOR)) {
+      throw new ForbiddenException('You do not have permission to view bans in this community');
+    }
+
+    return this.communityBanRepository.find({
+      where: { communityId },
+      relations: { user: true, bannedBy: true },
+      select: {
+        id: true,
+        communityId: true,
+        userId: true,
+        bannedById: true,
+        reason: true,
+        createdAt: true,
+        user: {
+          id: true,
+          username: true,
+          fullName: true,
+          avatarUrl: true,
+        },
+        bannedBy: {
+          id: true,
+          username: true,
+          fullName: true,
+        },
+      },
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  async banUser(communityId: string, targetUserId: string, requesterId: string, reason?: string): Promise<CommunityBan> {
+    if (targetUserId === requesterId) {
+      throw new BadRequestException('You cannot ban yourself');
+    }
+
+    const requester = await this.communityMemberRepository.findOne({
+      where: { communityId, userId: requesterId },
+    });
+
+    if (!requester || (requester.role !== CommunityRole.FOUNDER && requester.role !== CommunityRole.MODERATOR)) {
+      throw new ForbiddenException('You do not have permission to ban users');
+    }
+
+    const targetMember = await this.communityMemberRepository.findOne({
+      where: { communityId, userId: targetUserId },
+    });
+
+    if (targetMember) {
+      if (targetMember.role === CommunityRole.FOUNDER) {
+        throw new ForbiddenException('Founder cannot be banned');
+      }
+      if (requester.role === CommunityRole.MODERATOR && targetMember.role === CommunityRole.MODERATOR) {
+        throw new ForbiddenException('Moderators cannot ban other moderators');
+      }
+    }
+
+    const existingBan = await this.communityBanRepository.findOne({
+      where: { communityId, userId: targetUserId },
+    });
+    if (existingBan) {
+      throw new BadRequestException('User is already banned');
+    }
+
+    return this.communityRepository.manager.transaction(async (transactionalEntityManager) => {
+      const ban = transactionalEntityManager.create(CommunityBan, {
+        communityId,
+        userId: targetUserId,
+        bannedById: requesterId,
+        reason: reason || null,
+      });
+
+      const savedBan = await transactionalEntityManager.save(ban);
+
+      if (targetMember) {
+        await transactionalEntityManager.delete(CommunityMember, { id: targetMember.id });
+        await transactionalEntityManager.decrement(Community, { id: communityId }, 'memberCount', 1);
+      }
+
+      return savedBan;
+    });
+  }
+
+  async unbanUser(communityId: string, targetUserId: string, requesterId: string): Promise<void> {
+    const requester = await this.communityMemberRepository.findOne({
+      where: { communityId, userId: requesterId },
+    });
+
+    if (!requester || (requester.role !== CommunityRole.FOUNDER && requester.role !== CommunityRole.MODERATOR)) {
+      throw new ForbiddenException('You do not have permission to unban users');
+    }
+
+    const ban = await this.communityBanRepository.findOne({
+      where: { communityId, userId: targetUserId },
+    });
+
+    if (!ban) {
+      throw new NotFoundException('Ban not found for this user');
+    }
+
+    await this.communityBanRepository.delete({ id: ban.id });
+  }
+
+  async updateMemberRole(communityId: string, targetUserId: string, requesterId: string, newRole: CommunityRole): Promise<CommunityMember> {
+    const requester = await this.communityMemberRepository.findOne({
+      where: { communityId, userId: requesterId },
+    });
+
+    if (!requester || requester.role !== CommunityRole.FOUNDER) {
+      throw new ForbiddenException('Only the founder can manage member roles');
+    }
+
+    const targetMember = await this.communityMemberRepository.findOne({
+      where: { communityId, userId: targetUserId },
+      relations: { user: true },
+    });
+
+    if (!targetMember) {
+      throw new NotFoundException('Member not found');
+    }
+
+    if (targetMember.role === CommunityRole.FOUNDER) {
+      throw new BadRequestException('Cannot change founder role');
+    }
+
+    targetMember.role = newRole;
+    return this.communityMemberRepository.save(targetMember);
+  }
+
+  async joinCommunity(communityId: string, userId: string): Promise<CommunityMember> {
+    const community = await this.communityRepository.findOne({ where: { id: communityId } });
+    if (!community) {
+      throw new NotFoundException('Community not found');
+    }
+
+    // Check if already a member
+    const existing = await this.communityMemberRepository.findOne({
+      where: { communityId, userId },
+    });
+    if (existing) {
+      throw new ConflictException('Already a member of this community');
+    }
+
+    // Check if banned
+    const banned = await this.communityBanRepository.findOne({
+      where: { communityId, userId },
+    });
+    if (banned) {
+      throw new ForbiddenException('You are banned from this community');
+    }
+
+    return this.communityRepository.manager.transaction(async (transactionalEntityManager) => {
+      const member = transactionalEntityManager.create(CommunityMember, {
+        communityId,
+        userId,
+        role: CommunityRole.MEMBER,
+      });
+      const saved = await transactionalEntityManager.save(member);
+      await transactionalEntityManager.increment(Community, { id: communityId }, 'memberCount', 1);
+      return saved;
+    });
+  }
+
+  async leaveCommunity(communityId: string, userId: string): Promise<void> {
+    const member = await this.communityMemberRepository.findOne({
+      where: { communityId, userId },
+    });
+
+    if (!member) {
+      throw new NotFoundException('You are not a member of this community');
+    }
+
+    if (member.role === CommunityRole.FOUNDER) {
+      throw new ForbiddenException('Founders cannot leave their own community');
+    }
+
+    await this.communityRepository.manager.transaction(async (transactionalEntityManager) => {
+      await transactionalEntityManager.delete(CommunityMember, { id: member.id });
+      await transactionalEntityManager.decrement(Community, { id: communityId }, 'memberCount', 1);
+    });
+  }
+
+  async kickMember(communityId: string, targetUserId: string, requesterId: string): Promise<void> {
+    if (targetUserId === requesterId) {
+      throw new BadRequestException('You cannot kick yourself');
+    }
+
+    const requester = await this.communityMemberRepository.findOne({
+      where: { communityId, userId: requesterId },
+    });
+
+    if (!requester || (requester.role !== CommunityRole.FOUNDER && requester.role !== CommunityRole.MODERATOR)) {
+      throw new ForbiddenException('You do not have permission to kick members');
+    }
+
+    const targetMember = await this.communityMemberRepository.findOne({
+      where: { communityId, userId: targetUserId },
+    });
+
+    if (!targetMember) {
+      throw new NotFoundException('Member not found');
+    }
+
+    if (targetMember.role === CommunityRole.FOUNDER) {
+      throw new ForbiddenException('Founder cannot be kicked');
+    }
+
+    if (requester.role === CommunityRole.MODERATOR && targetMember.role === CommunityRole.MODERATOR) {
+      throw new ForbiddenException('Moderators cannot kick other moderators');
+    }
+
+    await this.communityRepository.manager.transaction(async (transactionalEntityManager) => {
+      await transactionalEntityManager.delete(CommunityMember, { id: targetMember.id });
+      await transactionalEntityManager.decrement(Community, { id: communityId }, 'memberCount', 1);
+    });
   }
 }

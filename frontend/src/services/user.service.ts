@@ -16,6 +16,23 @@ export interface ProfileResponse {
   avatarUrl: string | null;
   bannerUrl: string | null;
   createdAt?: string;
+  followerCount?: number;
+  followingCount?: number;
+}
+
+export interface FollowUserResponse {
+  id: string;
+  username: string;
+  fullName: string | null;
+  avatarUrl: string | null;
+  bio: string | null;
+  followerCount: number;
+  followingCount: number;
+}
+
+export interface FollowStatusResponse {
+  isFollowing: boolean;
+  isFollowedBy: boolean;
 }
 
 const UserService = {
@@ -39,20 +56,33 @@ const UserService = {
     });
   },
 
-  async getUsers(search?: string): Promise<any[]> {
-    return apiClient.get<any[]>('/users', { params: { search } });
+  async getUsers(search?: string): Promise<FollowUserResponse[]> {
+    return apiClient.get<FollowUserResponse[]>('/users', { params: { search } });
   },
 
-  async follow(userId: string): Promise<any> {
+  /** POST /users/:id/follow */
+  async follow(userId: string): Promise<{ success: boolean; isFollowing: boolean }> {
     return apiClient.post(`/users/${userId}/follow`);
   },
 
-  async unfollow(userId: string): Promise<any> {
+  /** DELETE /users/:id/follow */
+  async unfollow(userId: string): Promise<{ success: boolean; isFollowing: boolean }> {
     return apiClient.delete(`/users/${userId}/follow`);
   },
 
-  async getFollowing(userId: string): Promise<any[]> {
-    return apiClient.get<any[]>(`/users/${userId}/following`);
+  /** GET /users/:id/followers */
+  async getFollowers(userId: string): Promise<FollowUserResponse[]> {
+    return apiClient.get<FollowUserResponse[]>(`/users/${userId}/followers`);
+  },
+
+  /** GET /users/:id/following */
+  async getFollowing(userId: string): Promise<FollowUserResponse[]> {
+    return apiClient.get<FollowUserResponse[]>(`/users/${userId}/following`);
+  },
+
+  /** GET /users/:id/follow-status */
+  async getFollowStatus(userId: string): Promise<FollowStatusResponse> {
+    return apiClient.get<FollowStatusResponse>(`/users/${userId}/follow-status`);
   },
 };
 

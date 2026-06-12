@@ -1,0 +1,6 @@
+export enum NotificationType {
+  FOLLOW = 'FOLLOW',
+  POST_REACTION = 'POST_REACTION',
+  COMMENT = 'COMMENT',
+  COMMENT_REPLY = 'COMMENT_REPLY',
+}

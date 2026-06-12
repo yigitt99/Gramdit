@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Calendar, Edit3, X, Image as ImageIcon, MessageCircle, AlertCircle } from 'lucide-react';
@@ -36,10 +36,17 @@ function ProfileAv({
   );
 }
 
+// Sayı formatlama (1200 → 1.2K)
+function fmtNum(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return String(n);
+}
+
 export default function ProfilePage() {
   const { username } = useParams<{ username: string }>();
   const navigate = useNavigate();
-  
+
   const storeUser = useStore(s => s.user);
   const setState = useStore(s => s.setState);
   const currentUser = (storeUser ?? MOCK_USER) as AppUser;
@@ -48,13 +55,19 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState<ProfileResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   // Tabs: 'posts' | 'media' | 'comments'
   const [activeTab, setActiveTab] = useState<'posts' | 'media' | 'comments'>('posts');
-  
+
+  // Follow durumu
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [followLoading, setFollowLoading] = useState(false);
+  const [followerCount, setFollowerCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
+
   // Edit Profile Modal State
   const [editModalOpen, setEditModalOpen] = useState(false);
-  
+
   // Form States for Edit Profile
   const [fullName, setFullName] = useState('');
   const [bio, setBio] = useState('');
@@ -68,31 +81,66 @@ export default function ProfilePage() {
 
   const isOwnProfile = currentUser && currentUser.username.toLowerCase() === targetUsername.toLowerCase();
 
-  const fetchProfile = async () => {
+  const fetchProfile = useCallback(async () => {
     if (!targetUsername) return;
     try {
       setLoading(true);
       setError(null);
-      
+
       const data = await UserService.getProfileByUsername(targetUsername);
       setProfile(data);
-      
+      setFollowerCount(data.followerCount ?? 0);
+      setFollowingCount(data.followingCount ?? 0);
+
       // Initialize edit fields
       setFullName(data.fullName || '');
       setBio(data.bio || '');
       setAvatarUrl(data.avatarUrl || '');
       setBannerUrl(data.bannerUrl || '');
+
+      // Kendi profilimiz değilse follow-status'u çek
+      if (!isOwnProfile && storeUser && data.id !== storeUser.id) {
+        try {
+          const status = await UserService.getFollowStatus(data.id);
+          setIsFollowing(status.isFollowing);
+        } catch {
+          // ignore
+        }
+      }
     } catch (err: any) {
       console.error('Failed to load profile:', err);
       setError(err.response?.data?.message || 'Kullanıcı profili yüklenemedi.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [targetUsername, isOwnProfile, storeUser]);
 
   useEffect(() => {
     fetchProfile();
-  }, [targetUsername]);
+  }, [fetchProfile]);
+
+  const handleFollowToggle = async () => {
+    if (!profile || followLoading) return;
+    setFollowLoading(true);
+    const wasFollowing = isFollowing;
+    // Optimistik güncelleme
+    setIsFollowing(!wasFollowing);
+    setFollowerCount(prev => wasFollowing ? prev - 1 : prev + 1);
+    try {
+      if (wasFollowing) {
+        await UserService.unfollow(profile.id);
+      } else {
+        await UserService.follow(profile.id);
+      }
+    } catch (err: any) {
+      // Hata varsa geri al
+      console.error('Follow toggle failed:', err);
+      setIsFollowing(wasFollowing);
+      setFollowerCount(prev => wasFollowing ? prev + 1 : prev - 1);
+    } finally {
+      setFollowLoading(false);
+    }
+  };
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -105,15 +153,15 @@ export default function ProfilePage() {
         avatarUrl: avatarUrl.trim(),
         bannerUrl: bannerUrl.trim(),
       });
-      
+
       // Update local profile state
       setProfile(prev => prev ? { ...prev, ...updated } : null);
-      
+
       // Update global store
       const newUserData = { ...currentUser, ...updated };
       setState({ user: newUserData });
       localStorage.setItem('gramdit_user', JSON.stringify(newUserData));
-      
+
       setEditModalOpen(false);
     } catch (err: any) {
       console.error('Failed to update profile:', err);
@@ -126,7 +174,7 @@ export default function ProfilePage() {
   const initials = (profile?.fullName || profile?.username || 'U').slice(0, 2).toUpperCase();
   const accentColor = '#ff7a00';
 
-  const joinDate = profile?.createdAt 
+  const joinDate = profile?.createdAt
     ? new Date(profile.createdAt).toLocaleDateString('tr-TR', { year: 'numeric', month: 'long' })
     : 'Haziran 2026';
 
@@ -138,11 +186,11 @@ export default function ProfilePage() {
 
         {/* CENTER COLUMN */}
         <main className="w-full max-w-[600px] flex-shrink-1 h-screen overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden border-r border-[#ffffff14] flex flex-col bg-black/10 backdrop-blur-[1px]">
-          
+
           {/* Header */}
           <div className="sticky top-0 bg-[#050505]/75 backdrop-blur-md z-40 border-b border-[#ffffff14] h-[53px] flex items-center px-4 gap-6">
-            <button 
-              onClick={() => navigate(-1)} 
+            <button
+              onClick={() => navigate(-1)}
               className="p-2 rounded-full hover:bg-white/5 text-gray-400 hover:text-white transition-colors"
             >
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -171,7 +219,7 @@ export default function ProfilePage() {
               <p className="text-[12px] text-gray-500 max-w-[280px] leading-relaxed mb-4">
                 {error || 'Aradığınız kullanıcı mevcut değil veya bir hata oluştu.'}
               </p>
-              <button 
+              <button
                 onClick={() => navigate('/')}
                 className="px-5 py-2 rounded-full text-xs font-bold text-white bg-[#ff7a00] hover:bg-[#e86e00] transition-colors"
               >
@@ -180,13 +228,13 @@ export default function ProfilePage() {
             </div>
           ) : (
             <div className="flex flex-col w-full">
-              
+
               {/* ── BANNER & AVATAR AREA ── */}
               <div className="relative w-full h-[180px] sm:h-[200px] bg-neutral-900 overflow-hidden flex-shrink-0">
                 {profile.bannerUrl ? (
-                  <img 
-                    src={profile.bannerUrl} 
-                    alt="Banner" 
+                  <img
+                    src={profile.bannerUrl}
+                    alt="Banner"
                     className="w-full h-full object-cover"
                     onError={(e) => {
                       (e.currentTarget as HTMLImageElement).style.display = 'none';
@@ -195,26 +243,26 @@ export default function ProfilePage() {
                 ) : (
                   <div className="w-full h-full bg-gradient-to-br from-[#121212] via-[#1c1c1c] to-[#0a0a0a]" />
                 )}
-                
+
                 {/* Overlay shadow */}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent pointer-events-none" />
               </div>
 
               {/* Profile Meta Info Row */}
               <div className="px-4 pb-4 flex flex-col relative">
-                
+
                 {/* Avatar position overlaps banner */}
                 <div className="absolute -top-[55px] sm:-top-[65px] left-4 rounded-full border-[4px] border-[#050505] bg-[#050505] shadow-xl overflow-hidden z-10">
-                  <ProfileAv 
-                    url={profile.avatarUrl} 
-                    initials={initials} 
-                    color={accentColor} 
-                    size={isOwnProfile ? 100 : 110} 
+                  <ProfileAv
+                    url={profile.avatarUrl}
+                    initials={initials}
+                    color={accentColor}
+                    size={isOwnProfile ? 100 : 110}
                   />
                 </div>
 
-                {/* Edit Button or Takip Et space */}
-                <div className="flex justify-end h-[50px] items-center pt-2">
+                {/* Sağ üst buton alanı */}
+                <div className="flex justify-end h-[50px] items-center pt-2 gap-2">
                   {isOwnProfile ? (
                     <button
                       onClick={() => setEditModalOpen(true)}
@@ -224,8 +272,21 @@ export default function ProfilePage() {
                       Profili Düzenle
                     </button>
                   ) : (
-                    // Takip et butonu şimdilik eklenmeyecek
-                    <div className="h-8" />
+                    <motion.button
+                      whileTap={{ scale: 0.95 }}
+                      onClick={handleFollowToggle}
+                      disabled={followLoading}
+                      className={`flex items-center gap-1.5 px-5 py-1.5 rounded-full text-[13px] font-bold transition-all duration-200 disabled:opacity-60 ${
+                        isFollowing
+                          ? 'border border-white/15 text-white hover:border-rose-500/40 hover:text-rose-400 hover:bg-rose-500/5'
+                          : 'bg-[#ff7a00] hover:bg-[#e86e00] text-white shadow-lg shadow-[#ff7a00]/20'
+                      }`}
+                    >
+                      {followLoading ? (
+                        <div className="w-3 h-3 rounded-full border-2 border-t-current border-r-transparent border-b-transparent border-l-transparent animate-spin" />
+                      ) : null}
+                      {isFollowing ? 'Takipte' : 'Takip Et'}
+                    </motion.button>
                   )}
                 </div>
 
@@ -237,14 +298,14 @@ export default function ProfilePage() {
                   <p className="text-[14px] text-gray-500 font-medium leading-tight">
                     @{profile.username}
                   </p>
-                  
+
                   {profile.bio ? (
                     <p className="mt-3 text-[14.5px] leading-relaxed text-white/90 whitespace-pre-wrap">
                       {profile.bio}
                     </p>
                   ) : (
                     isOwnProfile && (
-                      <p 
+                      <p
                         onClick={() => setEditModalOpen(true)}
                         className="mt-3 text-[13px] leading-relaxed text-gray-600 hover:text-white/50 cursor-pointer italic"
                       >
@@ -254,9 +315,36 @@ export default function ProfilePage() {
                   )}
 
                   {/* Joined Date */}
-                  <div className="flex items-center gap-1.5 mt-3.5 text-[13px] text-gray-500">
+                  <div className="flex items-center gap-1.5 mt-3 text-[13px] text-gray-500">
                     <Calendar className="w-4 h-4 text-gray-600" />
                     <span>{joinDate} tarihinde katıldı</span>
+                  </div>
+
+                  {/* ── TAKİPÇİ / TAKİP EDİLEN SAYILARI ── */}
+                  <div className="flex items-center gap-5 mt-4">
+                    <button
+                      onClick={() => {/* ileride takipçi modal açılacak */}}
+                      className="flex items-center gap-1.5 group hover:opacity-80 transition-opacity"
+                    >
+                      <span className="text-[15px] font-extrabold text-white leading-none">
+                        {fmtNum(followingCount)}
+                      </span>
+                      <span className="text-[13px] text-gray-500 group-hover:text-gray-300 transition-colors">
+                        Takip Edilen
+                      </span>
+                    </button>
+
+                    <button
+                      onClick={() => {/* ileride takipçi modal açılacak */}}
+                      className="flex items-center gap-1.5 group hover:opacity-80 transition-opacity"
+                    >
+                      <span className="text-[15px] font-extrabold text-white leading-none">
+                        {fmtNum(followerCount)}
+                      </span>
+                      <span className="text-[13px] text-gray-500 group-hover:text-gray-300 transition-colors">
+                        Takipçi
+                      </span>
+                    </button>
                   </div>
                 </div>
 
@@ -329,16 +417,16 @@ export default function ProfilePage() {
       {/* ── EDIT PROFILE MODAL ── */}
       <AnimatePresence>
         {editModalOpen && (
-          <motion.div 
-            initial={{ opacity: 0 }} 
-            animate={{ opacity: 1 }} 
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex items-start justify-center pt-[8vh] px-4"
             style={{ background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(5px)' }}
             onClick={(e) => { if (e.target === e.currentTarget && !updateLoading) setEditModalOpen(false); }}
           >
-            <motion.div 
-              initial={{ scale: 0.95, y: -15, opacity: 0 }} 
+            <motion.div
+              initial={{ scale: 0.95, y: -15, opacity: 0 }}
               animate={{ scale: 1, y: 0, opacity: 1 }}
               exit={{ scale: 0.95, y: -8, opacity: 0 }}
               className="w-full max-w-[520px] rounded-2xl shadow-2xl overflow-hidden flex flex-col"
@@ -347,17 +435,17 @@ export default function ProfilePage() {
               {/* Header */}
               <div className="flex items-center justify-between px-5 py-4 border-b border-white/5 bg-[#090909]">
                 <div className="flex items-center gap-3">
-                  <button 
+                  <button
                     type="button"
                     onClick={() => setEditModalOpen(false)}
                     disabled={updateLoading}
                     className="p-1.5 rounded-full hover:bg-white/5 text-gray-400 hover:text-white transition-all disabled:opacity-30"
                   >
-                    <X className="w-4.5 h-4.5" />
+                    <X className="w-4 h-4" />
                   </button>
                   <span className="text-[15.5px] font-bold text-white">Profili Düzenle</span>
                 </div>
-                
+
                 <button
                   type="submit"
                   form="edit-profile-form"
@@ -369,9 +457,9 @@ export default function ProfilePage() {
               </div>
 
               {/* Form Body */}
-              <form 
-                id="edit-profile-form" 
-                onSubmit={handleUpdateProfile} 
+              <form
+                id="edit-profile-form"
+                onSubmit={handleUpdateProfile}
                 className="p-5 flex flex-col gap-4 overflow-y-auto max-h-[70vh] bg-transparent"
               >
                 {updateError && (

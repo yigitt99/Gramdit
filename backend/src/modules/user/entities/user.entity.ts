@@ -13,6 +13,8 @@ import { Post } from '../../post/entities/post.entity';
 import { Comment } from '../../comment/entities/comment.entity';
 import { Reaction } from '../../reaction/entities/reaction.entity';
 import { Follow } from '../../follow/entities/follow.entity';
+import { Notification } from '../../notification/entities/notification.entity';
+import { CommunityBan } from '../../community/entities/community-ban.entity';
 
 @Entity('users')
 @Index('IDX_users_username', ['username'], { unique: true })
@@ -44,6 +46,18 @@ export class User {
 
   @OneToMany(() => Follow, (follow) => follow.following)
   followers: Follow[];
+
+  @OneToMany(() => Notification, (n) => n.recipient)
+  notifications: Notification[];
+
+  @OneToMany(() => Notification, (n) => n.sender)
+  sentNotifications: Notification[];
+
+  @OneToMany(() => CommunityBan, (ban) => ban.user)
+  communityBans: CommunityBan[];
+
+  @OneToMany(() => CommunityBan, (ban) => ban.bannedBy)
+  givenCommunityBans: CommunityBan[];
 
   @Column({
     type: 'varchar',

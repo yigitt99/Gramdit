@@ -5,11 +5,15 @@ import { Post } from '../post/entities/post.entity';
 import { CommentService } from './comment.service';
 import { CommentController } from './comment.controller';
 import { AuthModule } from '../auth/auth.module';
+import { CommunityMember } from '../community/entities/community-member.entity';
+import { CommunityBan } from '../community/entities/community-ban.entity';
+import { NotificationModule } from '../notification/notification.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Comment, Post]),
+    TypeOrmModule.forFeature([Comment, Post, CommunityMember, CommunityBan]),
     AuthModule,
+    NotificationModule,
   ],
   controllers: [CommentController],
   providers: [CommentService],

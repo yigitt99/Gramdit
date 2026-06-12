@@ -1,11 +1,13 @@
-import { Injectable, ConflictException, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, ConflictException, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Post } from './entities/post.entity';
 import { Community } from '../community/entities/community.entity';
 import { CommunityMember } from '../community/entities/community-member.entity';
 import { User } from '../user/entities/user.entity';
+import { CommunityBan } from '../community/entities/community-ban.entity';
 import { CreatePostDto } from './dto/create-post.dto';
+import { CommunityRole } from '../community/enums/community-role.enum';
 
 @Injectable()
 export class PostService {
@@ -18,6 +20,8 @@ export class PostService {
     private readonly communityMemberRepository: Repository<CommunityMember>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    @InjectRepository(CommunityBan)
+    private readonly communityBanRepository: Repository<CommunityBan>,
   ) {}
 
   async create(createPostDto: CreatePostDto, authorId: string): Promise<Post> {
@@ -34,6 +38,14 @@ export class PostService {
       community = await this.communityRepository.findOne({ where: { id: communityId } });
       if (!community) {
         throw new NotFoundException('Community not found');
+      }
+
+      // Check if user is banned from this community
+      const isBanned = await this.communityBanRepository.findOne({
+        where: { communityId, userId: authorId },
+      });
+      if (isBanned) {
+        throw new ForbiddenException('You are banned from posting in this community');
       }
 
       // Check if user is a member of the community
@@ -185,5 +197,33 @@ export class PostService {
       },
       order: { createdAt: 'DESC' },
     });
+  }
+
+  async delete(id: string, userId: string): Promise<void> {
+    const post = await this.postRepository.findOne({
+      where: { id },
+    });
+
+    if (!post) {
+      throw new NotFoundException('Post not found');
+    }
+
+    if (post.authorId === userId) {
+      await this.postRepository.remove(post);
+      return;
+    }
+
+    if (post.communityId) {
+      const member = await this.communityMemberRepository.findOne({
+        where: { communityId: post.communityId, userId },
+      });
+
+      if (member && (member.role === CommunityRole.FOUNDER || member.role === CommunityRole.MODERATOR)) {
+        await this.postRepository.remove(post);
+        return;
+      }
+    }
+
+    throw new ForbiddenException('You do not have permission to delete this post');
   }
 }

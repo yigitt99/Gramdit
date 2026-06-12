@@ -5,6 +5,8 @@ import { Reaction } from './entities/reaction.entity';
 import { Post } from '../post/entities/post.entity';
 import { Comment } from '../comment/entities/comment.entity';
 import { CreateReactionDto } from './dto/create-reaction.dto';
+import { NotificationService } from '../notification/notification.service';
+import { NotificationType } from '../notification/enums/notification-type.enum';
 
 @Injectable()
 export class ReactionService {
@@ -15,6 +17,7 @@ export class ReactionService {
     private readonly postRepository: Repository<Post>,
     @InjectRepository(Comment)
     private readonly commentRepository: Repository<Comment>,
+    private readonly notificationService: NotificationService,
   ) {}
 
   async handlePostReaction(postId: string, userId: string, dto: CreateReactionDto): Promise<Reaction | { toggledOff: boolean }> {
@@ -28,14 +31,15 @@ export class ReactionService {
     });
 
     let result: Reaction | { toggledOff: boolean };
+    let isNewReaction = false;
 
     if (existing) {
       if (existing.reactionType === dto.reactionType) {
-        // Aynı reaksiyon tipi bırakıldıysa kaldır (toggle off)
+        // Aynı reaksiyon tipi → kaldır (toggle off)
         await this.reactionRepository.remove(existing);
         result = { toggledOff: true };
       } else {
-        // Farklı reaksiyon tipi bırakıldıysa güncelle
+        // Farklı reaksiyon tipi → güncelle
         existing.reactionType = dto.reactionType;
         result = await this.reactionRepository.save(existing);
       }
@@ -44,15 +48,26 @@ export class ReactionService {
       const newReaction = this.reactionRepository.create({
         userId,
         postId,
-        commentId: null, // İkisine birden ait olamaz kuralı
+        commentId: null,
         reactionType: dto.reactionType,
       });
       result = await this.reactionRepository.save(newReaction);
+      isNewReaction = true;
     }
 
-    // reactionCount alanını otomatik güncelle
+    // reactionCount güncelle
     const count = await this.reactionRepository.count({ where: { postId } });
     await this.postRepository.update(postId, { reactionCount: count });
+
+    // Yeni reaksiyon ise bildirim gönder (post yazarına)
+    if (isNewReaction) {
+      await this.notificationService.create({
+        recipientId: post.authorId,
+        senderId: userId,
+        type: NotificationType.POST_REACTION,
+        referenceId: postId,
+      });
+    }
 
     return result;
   }
@@ -71,26 +86,23 @@ export class ReactionService {
 
     if (existing) {
       if (existing.reactionType === dto.reactionType) {
-        // Aynı reaksiyon tipi bırakıldıysa kaldır (toggle off)
         await this.reactionRepository.remove(existing);
         result = { toggledOff: true };
       } else {
-        // Farklı reaksiyon tipi bırakıldıysa güncelle
         existing.reactionType = dto.reactionType;
         result = await this.reactionRepository.save(existing);
       }
     } else {
-      // Yeni reaksiyon oluştur
       const newReaction = this.reactionRepository.create({
         userId,
         commentId,
-        postId: null, // İkisine birden ait olamaz kuralı
+        postId: null,
         reactionType: dto.reactionType,
       });
       result = await this.reactionRepository.save(newReaction);
     }
 
-    // comment entity'sindeki reactionCount alanını güncelle
+    // comment reactionCount güncelle
     const count = await this.reactionRepository.count({ where: { commentId } });
     await this.commentRepository.update(commentId, { reactionCount: count });
 

@@ -12,6 +12,7 @@ import {
 import { User } from '../../user/entities/user.entity';
 import { CommunityMember } from './community-member.entity';
 import { Post } from '../../post/entities/post.entity';
+import { CommunityBan } from './community-ban.entity';
 
 @Entity('communities')
 @Index('IDX_communities_name', ['name'], { unique: true })
@@ -25,6 +26,9 @@ export class Community {
 
   @OneToMany(() => Post, (post) => post.community)
   posts: Post[];
+
+  @OneToMany(() => CommunityBan, (ban) => ban.community)
+  bans: CommunityBan[];
 
   @Column({ type: 'varchar', length: 100, unique: true, nullable: false })
   name: string;

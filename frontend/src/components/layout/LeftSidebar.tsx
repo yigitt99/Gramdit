@@ -6,6 +6,7 @@ import {
   User, MoreHorizontal, Plus, Settings, LogOut
 } from 'lucide-react';
 import useStore from '@/store';
+import NotificationService from '../../services/notification.service';
 
 export const T = {
   bg:       '#050505',
@@ -18,15 +19,6 @@ export const T = {
   muted:    '#9ca3af',
   mutedLo:  'rgba(156,163,175,0.4)',
 } as const;
-
-const NAV = [
-  { icon: Home,          label: 'Anasayfa',       path: '/',              badge: 0 },
-  { icon: Bell,          label: 'Bildirimler',    path: '/notifications', badge: 3 },
-  { icon: UserPlus,      label: 'Takip Et',       path: '/following',     badge: 0 },
-  { icon: MessageSquare, label: 'Sohbet',          path: '/messages',      badge: 5 },
-  { icon: Bookmark,      label: 'Yer İşaretleri', path: '/bookmarks',     badge: 0 },
-  { icon: User,          label: 'Profil',          path: '/profile',       badge: 0 },
-];
 
 export function Av({
   url, initials, color, size = 38, className = '',
@@ -49,6 +41,25 @@ export function LeftSidebar({ user, onCompose }: { user: any; onCompose: () => v
   const logout  = useStore(s => s.logout);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  // Okunmamış bildirim sayısını çek
+  useEffect(() => {
+    const fetchUnread = async () => {
+      try {
+        const { count } = await NotificationService.getUnreadCount();
+        setUnreadCount(count);
+      } catch {
+        // Hata sessizce geç
+      }
+    };
+
+    fetchUnread();
+
+    // Her 30 saniyede bir güncelle
+    const interval = setInterval(fetchUnread, 30_000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     const h = (e: MouseEvent) => {
@@ -60,10 +71,27 @@ export function LeftSidebar({ user, onCompose }: { user: any; onCompose: () => v
 
   const initials = (user.fullName || user.username).slice(0, 2).toUpperCase();
 
+  // Bildirimler sayfasına gidildiğinde badge'i sıfırla
+  const handleNavClick = (path: string) => {
+    if (path === '/notifications') {
+      setUnreadCount(0);
+    }
+    navigate(path === '/profile' ? `/@${user.username}` : path);
+  };
+
+  const NAV = [
+    { icon: Home,          label: 'Anasayfa',       path: '/',              badge: 0 },
+    { icon: Bell,          label: 'Bildirimler',    path: '/notifications', badge: unreadCount },
+    { icon: UserPlus,      label: 'Takip Et',       path: '/following',     badge: 0 },
+    { icon: MessageSquare, label: 'Sohbet',          path: '/messages',      badge: 0 },
+    { icon: Bookmark,      label: 'Yer İşaretleri', path: '/bookmarks',     badge: 0 },
+    { icon: User,          label: 'Profil',          path: '/profile',       badge: 0 },
+  ];
+
   return (
     <aside className="w-[70px] xl:w-[275px] flex-shrink-0 flex flex-col h-screen py-4 px-2 xl:pr-4 justify-between items-end border-r border-[#ffffff14]">
       <div className="w-full xl:w-[240px] flex flex-col h-full justify-between">
-        
+
         <div className="flex flex-col gap-1.5 w-full">
           {/* Logo */}
           <div className="flex items-center justify-center xl:justify-start px-3 mb-6 h-[50px] w-full">
@@ -79,7 +107,7 @@ export function LeftSidebar({ user, onCompose }: { user: any; onCompose: () => v
               return (
                 <button
                   key={path}
-                  onClick={() => navigate(path === '/profile' ? `/@${user.username}` : path)}
+                  onClick={() => handleNavClick(path)}
                   className="group flex items-center justify-center xl:justify-start gap-4 w-full py-3 px-3 xl:px-4 rounded-full text-[16px] transition-all duration-150 relative"
                   style={{
                     background: active ? T.accentBg : 'transparent',
@@ -92,22 +120,26 @@ export function LeftSidebar({ user, onCompose }: { user: any; onCompose: () => v
                   <div className="relative flex items-center justify-center">
                     <Icon className="w-[22px] h-[22px] flex-shrink-0" strokeWidth={active ? 2.2 : 1.8}
                       style={{ color: active ? T.accent : T.muted }} />
-                    
+
                     {/* Badge for Collapsed View */}
                     {badge > 0 && (
                       <span className="absolute -top-1.5 -right-1.5 min-w-[15px] h-[15px] px-0.5 rounded-full text-white text-[9px] font-bold flex items-center justify-center bg-[#ff7a00] xl:hidden">
-                        {badge}
+                        {badge > 99 ? '99+' : badge}
                       </span>
                     )}
                   </div>
 
                   <span className="hidden xl:block text-left text-[17px] flex-1">{label}</span>
-                  
+
                   {/* Badge for Expanded View */}
                   {badge > 0 && (
-                    <span className="hidden xl:flex min-w-[18px] h-[18px] px-1 rounded-full text-white text-[10px] font-bold items-center justify-center bg-[#ff7a00]">
-                      {badge}
-                    </span>
+                    <motion.span
+                      initial={{ scale: 0.6 }}
+                      animate={{ scale: 1 }}
+                      className="hidden xl:flex min-w-[18px] h-[18px] px-1 rounded-full text-white text-[10px] font-bold items-center justify-center bg-[#ff7a00]"
+                    >
+                      {badge > 99 ? '99+' : badge}
+                    </motion.span>
                   )}
                 </button>
               );

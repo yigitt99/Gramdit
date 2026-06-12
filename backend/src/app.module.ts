@@ -14,6 +14,7 @@ import { PostMediaModule } from './modules/post-media/post-media.module';
 import { CommentModule } from './modules/comment/comment.module';
 import { ReactionModule } from './modules/reaction/reaction.module';
 import { FollowModule } from './modules/follow/follow.module';
+import { NotificationModule } from './modules/notification/notification.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { FollowModule } from './modules/follow/follow.module';
     CommentModule,
     ReactionModule,
     FollowModule,
+    NotificationModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -5,6 +5,7 @@ import LoginPage from './pages/LoginPage';
 import CommunityPage from './pages/CommunityPage';
 import PostDetailPage from './pages/PostDetailPage';
 import ProfilePage from './pages/ProfilePage';
+import NotificationsPage from './pages/NotificationsPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import { WebGLShader } from './components/ui/web-gl-shader';
 import useStore from './store';
@@ -73,6 +74,12 @@ function App() {
             <Route path="/:username" element={
               <ProtectedRoute>
                 <ProfilePage />
+              </ProtectedRoute>
+            } />
+
+            <Route path="/notifications" element={
+              <ProtectedRoute>
+                <NotificationsPage />
               </ProtectedRoute>
             } />
 
