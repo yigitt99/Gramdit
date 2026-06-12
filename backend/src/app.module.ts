@@ -8,6 +8,12 @@ import { RedisModule } from './redis/redis.module';
 import { validateEnv } from './config/env.validation';
 import { UserModule } from './modules/user/user.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { CommunityModule } from './modules/community/community.module';
+import { PostModule } from './modules/post/post.module';
+import { PostMediaModule } from './modules/post-media/post-media.module';
+import { CommentModule } from './modules/comment/comment.module';
+import { ReactionModule } from './modules/reaction/reaction.module';
+import { FollowModule } from './modules/follow/follow.module';
 
 @Module({
   imports: [
@@ -20,6 +26,12 @@ import { AuthModule } from './modules/auth/auth.module';
     RedisModule,
     UserModule,
     AuthModule,
+    CommunityModule,
+    PostModule,
+    PostMediaModule,
+    CommentModule,
+    ReactionModule,
+    FollowModule,
   ],
   controllers: [AppController],
   providers: [AppService],

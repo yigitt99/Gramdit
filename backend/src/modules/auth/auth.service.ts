@@ -271,6 +271,8 @@ export class AuthService {
       fullName: user.fullName,
       avatarUrl: user.avatarUrl,
       role: user.role,
+      followerCount: user.followerCount,
+      followingCount: user.followingCount,
     };
   }
 

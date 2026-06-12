@@ -5,8 +5,14 @@ import {
   Index,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
+  OneToMany,
 } from 'typeorm';
 import { UserRole } from '../enums/user-role.enum';
+import { CommunityMember } from '../../community/entities/community-member.entity';
+import { Post } from '../../post/entities/post.entity';
+import { Comment } from '../../comment/entities/comment.entity';
+import { Reaction } from '../../reaction/entities/reaction.entity';
+import { Follow } from '../../follow/entities/follow.entity';
 
 @Entity('users')
 @Index('IDX_users_username', ['username'], { unique: true })
@@ -14,6 +20,30 @@ import { UserRole } from '../enums/user-role.enum';
 export class User {
   @PrimaryGeneratedColumn('uuid')
   id: string;
+
+  @OneToMany(() => CommunityMember, (member) => member.user)
+  communityMembers: CommunityMember[];
+
+  @OneToMany(() => Post, (post) => post.author)
+  posts: Post[];
+
+  @OneToMany(() => Comment, (comment) => comment.author)
+  comments: Comment[];
+
+  @OneToMany(() => Reaction, (reaction) => reaction.user)
+  reactions: Reaction[];
+
+  @Column({ type: 'integer', default: 0, name: 'follower_count' })
+  followerCount: number;
+
+  @Column({ type: 'integer', default: 0, name: 'following_count' })
+  followingCount: number;
+
+  @OneToMany(() => Follow, (follow) => follow.follower)
+  following: Follow[];
+
+  @OneToMany(() => Follow, (follow) => follow.following)
+  followers: Follow[];
 
   @Column({
     type: 'varchar',
@@ -60,6 +90,14 @@ export class User {
     name: 'avatar_url',
   })
   avatarUrl: string | null;
+
+  @Column({
+    type: 'varchar',
+    length: 500,
+    nullable: true,
+    name: 'banner_url',
+  })
+  bannerUrl: string | null;
 
   @Column({
     type: 'enum',

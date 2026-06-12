@@ -5,6 +5,7 @@ import {
   Post,
   Get,
   Query,
+  Param,
   Req,
   UnauthorizedException,
   HttpCode,
@@ -63,6 +64,44 @@ export class UserController {
   @HttpCode(HttpStatus.OK)
   async listUsers(@Query('search') search?: string) {
     return this.userService.listUsers(search);
+  }
+
+  @Get('me')
+  @HttpCode(HttpStatus.OK)
+  async getMe(@Req() req: Request) {
+    const userId = this.extractUserId(req);
+    const user = await this.userService.findById(userId);
+    return {
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      fullName: user.fullName,
+      bio: user.bio,
+      avatarUrl: user.avatarUrl,
+      bannerUrl: user.bannerUrl,
+      createdAt: user.createdAt,
+    };
+  }
+
+  @Get(':usernameOrId')
+  @HttpCode(HttpStatus.OK)
+  async getUser(@Param('usernameOrId') param: string) {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    let user;
+    if (uuidRegex.test(param)) {
+      user = await this.userService.findById(param);
+    } else {
+      user = await this.userService.findByUsername(param);
+    }
+    return {
+      id: user.id,
+      username: user.username,
+      fullName: user.fullName,
+      bio: user.bio,
+      avatarUrl: user.avatarUrl,
+      bannerUrl: user.bannerUrl,
+      createdAt: user.createdAt,
+    };
   }
 
   @Post('avatar')

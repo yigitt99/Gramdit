@@ -11,29 +11,17 @@
  *   muted    #9ca3af
  */
 import React, { useState, useRef, useEffect } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Home, Bell, UserPlus, MessageSquare, Bookmark,
-  User, MoreHorizontal, Heart, MessageCircle,
-  Repeat2, Share2, ImageIcon, X, Settings, LogOut,
-  Search, Plus, Check, Hash, ChevronDown,
+  Heart, MessageCircle, Bookmark,
+  Repeat2, Share2, ImageIcon, X,
   Smile, Sparkles
 } from 'lucide-react';
 import useStore from '@/store';
-
-// ─── DESIGN TOKENS ───────────────────────────────────────────────────────────
-const T = {
-  bg:       '#050505',
-  card:     '#0d0d0d',
-  cardHov:  '#111111',
-  border:   'rgba(255,255,255,0.08)',
-  accent:   '#ff7a00',
-  accentBg: 'rgba(255,122,0,0.12)',
-  text:     '#ffffff',
-  muted:    '#9ca3af',
-  mutedLo:  'rgba(156,163,175,0.4)',
-} as const;
+import PostService, { PostResponse, CommentResponse } from '../services/post.service';
+import { LeftSidebar, T, Av } from '../components/layout/LeftSidebar';
+import { RightSidebar } from '../components/layout/RightSidebar';
 
 // ─── DEV MOCK ────────────────────────────────────────────────────────────────
 const MOCK_USER = {
@@ -42,268 +30,631 @@ const MOCK_USER = {
 };
 type AppUser = typeof MOCK_USER;
 
-// ─── PLACEHOLDER DATA ─────────────────────────────────────────────────────────
-const POSTS = [
-  {
-    id: 'p1',
-    author: { name: 'Zeynep Arslan', handle: 'zeyneparslann', initials: 'ZA', color: '#ff7a00', verified: true },
-    content: 'Gramdit kullanmaya başladığımdan beri yazılarımdaki gramer hataları ciddi ölçüde azaldı. AI destekli düzeltme önerileri gerçekten inanılmaz! 🎯',
-    time: '2 saat',
-    comments: 27, reposts: 17, likes: 184, liked: false, bookmarked: false,
-  },
-  {
-    id: 'p2',
-    author: { name: 'Burak Çelik', handle: 'burakcelik', initials: 'BÇ', color: '#8b5cf6', verified: false },
-    content: 'Türkçeye özgü gramer kurallarını bu kadar doğru yorumlayan bir asistan daha önce görmemiştim. Tebrikler Gramdit ekibi! 👏',
-    time: '4 saat',
-    comments: 14, reposts: 6, likes: 97, liked: false, bookmarked: true,
-  },
-  {
-    id: 'p3',
-    author: { name: 'Selin Kara', handle: 'selinkara', initials: 'SK', color: '#ec4899', verified: false },
-    content: 'Akademik tezimi göndermeden önce her zaman Gramdit\'e atıyorum. Noktalama ve cümle yapısı önerileri mükemmel! 📝',
-    time: '6 saat',
-    comments: 41, reposts: 18, likes: 256, liked: true, bookmarked: false,
-  },
-];
-
-const USERS = [
-  { id: 'u1', name: 'Ayşe Yılmaz',  handle: 'ayseyilmaz',  initials: 'AY', color: '#ff7a00', following: false },
-  { id: 'u2', name: 'Mehmet Kaya',  handle: 'mehmetkaya',  initials: 'MK', color: '#8b5cf6', following: false },
-  { id: 'u3', name: 'Fatma Şahin', handle: 'fatmasahin',  initials: 'FŞ', color: '#ec4899', following: false },
-  { id: 'u4', name: 'Ali Öztürk',   handle: 'aliozturk',   initials: 'AÖ', color: '#10b981', following: false },
-];
-
-const COMMUNITIES = [
-  { id: 'c1', name: 'Türkçe Yazarlar',   members: 12, initials: 'TY', color: '#ff7a00', joined: false },
-  { id: 'c2', name: 'Gramer Topluluğu', members: 8,  initials: 'GT', color: '#8b5cf6', joined: false },
-  { id: 'c3', name: 'Akademik Yazarlık', members: 21, initials: 'AY', color: '#ec4899', joined: true  },
-];
-
-const NAV = [
-  { icon: Home,          label: 'Anasayfa',       path: '/',              badge: 0 },
-  { icon: Bell,          label: 'Bildirimler',    path: '/notifications', badge: 3 },
-  { icon: UserPlus,      label: 'Takip Et',       path: '/following',     badge: 0 },
-  { icon: MessageSquare, label: 'Sohbet',          path: '/messages',      badge: 5 },
-  { icon: Bookmark,      label: 'Yer İşaretleri', path: '/bookmarks',     badge: 0 },
-  { icon: User,          label: 'Profil',          path: '/profile',       badge: 0 },
-];
-
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 const fmt = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(1)}K` : String(n);
-
-// ─── AVATAR ───────────────────────────────────────────────────────────────────
-function Av({
-  url, initials, color, size = 38, className = '',
-}: {
-  url?: string | null; initials: string; color: string; size?: number; className?: string;
-}) {
-  const d = { width: size, height: size, minWidth: size };
-  if (url) return <img src={url} alt="" style={d} className={`rounded-full object-cover flex-shrink-0 ${className}`} />;
-  return (
-    <div style={{ ...d, background: `${color}20`, border: `1.5px solid ${color}45` }}
-      className={`rounded-full flex items-center justify-center flex-shrink-0 select-none ${className}`}>
-      <span style={{ color, fontSize: size * 0.37 }} className="font-bold leading-none">{initials}</span>
-    </div>
-  );
-}
-
-// ─── CARD WRAPPER ─────────────────────────────────────────────────────────────
-function Card({ children, className = '', style = {} }: { children: React.ReactNode; className?: string; style?: React.CSSProperties }) {
-  return (
-    <div className={`rounded-2xl ${className}`}
-      style={{ background: T.card, border: `1px solid ${T.border}`, ...style }}>
-      {children}
-    </div>
-  );
-}
-
-// ─── SECTION LABEL ────────────────────────────────────────────────────────────
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="text-[11px] font-bold uppercase tracking-[0.14em] mb-3 text-gray-500">
-      {children}
-    </p>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// LEFT SIDEBAR
-// ─────────────────────────────────────────────────────────────────────────────
-function LeftSidebar({ user, onCompose }: { user: AppUser; onCompose: () => void }) {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const logout  = useStore(s => s.logout);
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const h = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', h);
-    return () => document.removeEventListener('mousedown', h);
-  }, []);
-
-  const initials = (user.fullName || user.username).slice(0, 2).toUpperCase();
-
-  return (
-    <aside className="w-[70px] xl:w-[275px] flex-shrink-0 flex flex-col h-screen py-4 px-2 xl:pr-4 justify-between items-end border-r border-[#ffffff14]">
-      <div className="w-full xl:w-[240px] flex flex-col h-full justify-between">
-        
-        <div className="flex flex-col gap-1.5 w-full">
-          {/* Logo */}
-          <div className="flex items-center justify-center xl:justify-start px-3 mb-6 h-[50px] w-full">
-            <span className="custom-font-serif text-[26px] font-light tracking-tight text-white hidden xl:block select-none">Gramdit</span>
-            {/* Collapsed G Logo */}
-            <span className="custom-font-serif text-[26px] font-extrabold text-[#ff7a00] xl:hidden select-none">G</span>
-          </div>
-
-          {/* Nav Links */}
-          <nav className="flex flex-col gap-1 w-full">
-            {NAV.map(({ icon: Icon, label, path, badge }) => {
-              const active = location.pathname === path;
-              return (
-                <button
-                  key={path}
-                  onClick={() => navigate(path)}
-                  className="group flex items-center justify-center xl:justify-start gap-4 w-full py-3 px-3 xl:px-4 rounded-full text-[16px] transition-all duration-150 relative"
-                  style={{
-                    background: active ? T.accentBg : 'transparent',
-                    color: active ? T.text : T.muted,
-                    fontWeight: active ? 700 : 500,
-                  }}
-                  onMouseEnter={e => { if (!active) (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.04)'; }}
-                  onMouseLeave={e => { if (!active) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
-                >
-                  <div className="relative flex items-center justify-center">
-                    <Icon className="w-[22px] h-[22px] flex-shrink-0" strokeWidth={active ? 2.2 : 1.8}
-                      style={{ color: active ? T.accent : T.muted }} />
-                    
-                    {/* Badge for Collapsed View */}
-                    {badge > 0 && (
-                      <span className="absolute -top-1.5 -right-1.5 min-w-[15px] h-[15px] px-0.5 rounded-full text-white text-[9px] font-bold flex items-center justify-center bg-[#ff7a00] xl:hidden">
-                        {badge}
-                      </span>
-                    )}
-                  </div>
-
-                  <span className="hidden xl:block text-left text-[17px] flex-1">{label}</span>
-                  
-                  {/* Badge for Expanded View */}
-                  {badge > 0 && (
-                    <span className="hidden xl:flex min-w-[18px] h-[18px] px-1 rounded-full text-white text-[10px] font-bold items-center justify-center bg-[#ff7a00]">
-                      {badge}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-
-            {/* More Menu */}
-            <button
-              className="group flex items-center justify-center xl:justify-start gap-4 w-full py-3 px-3 xl:px-4 rounded-full text-[16px] transition-all duration-150 text-gray-400 hover:text-white"
-              onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.04)'}
-              onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
-            >
-              <MoreHorizontal className="w-[22px] h-[22px] flex-shrink-0" strokeWidth={1.8} />
-              <span className="hidden xl:block text-[17px] text-left">Daha Fazla</span>
-            </button>
-
-            {/* Compose Button */}
-            <div className="mt-4 px-1 w-full flex justify-center xl:block">
-              {/* Collapsed view: circular orange button */}
-              <button onClick={onCompose}
-                className="xl:hidden w-[48px] h-[48px] rounded-full flex items-center justify-center text-white bg-[#ff7a00] hover:bg-[#e86e00] transition-colors shadow-lg shadow-[#ff7a00]/20 active:scale-95">
-                <Plus className="w-5 h-5" />
-              </button>
-              {/* Expanded view: pill button */}
-              <button onClick={onCompose}
-                className="hidden xl:block w-full py-3.5 rounded-full text-[15px] font-bold text-white bg-[#ff7a00] hover:bg-[#e86e00] transition-all duration-200 shadow-md shadow-[#ff7a00]/10 active:scale-[0.97]">
-                Gönderi Yayınla
-              </button>
-            </div>
-          </nav>
-        </div>
-
-        {/* Profile Card / Dropdown */}
-        <div className="relative w-full flex justify-center xl:block" ref={ref}>
-          <button onClick={() => setOpen(o => !o)}
-            className="flex items-center gap-3 p-2 xl:p-2.5 xl:w-full rounded-full hover:bg-white/5 transition-colors">
-            <Av url={user.avatarUrl} initials={initials} color={T.accent} size={38} />
-            <div className="hidden xl:flex flex-col flex-1 min-w-0 text-left">
-              <p className="text-[14px] font-bold truncate text-white leading-tight">
-                {user.fullName || user.username}
-              </p>
-              <p className="text-[12px] truncate text-gray-500 leading-tight">@{user.username}</p>
-            </div>
-            <MoreHorizontal className="hidden xl:block w-4 h-4 text-gray-500 ml-auto flex-shrink-0" />
-          </button>
-
-          <AnimatePresence>
-            {open && (
-              <motion.div initial={{ opacity: 0, y: 4, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 4, scale: 0.97 }} transition={{ duration: 0.1 }}
-                className="absolute bottom-full left-1/2 -translate-x-1/2 xl:left-0 xl:translate-x-0 mb-2 py-1.5 w-[200px] xl:w-full rounded-2xl shadow-2xl z-50 bg-[#111] border border-white/10">
-                <button onClick={() => { setOpen(false); navigate('/profile'); }}
-                  className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-400 hover:text-white hover:bg-white/5 transition-colors">
-                  <User className="w-4 h-4" /> Profilim
-                </button>
-                <button onClick={() => setOpen(false)}
-                  className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-400 hover:text-white hover:bg-white/5 transition-colors">
-                  <Settings className="w-4 h-4" /> Ayarlar
-                </button>
-                <div className="my-1 border-t border-white/5" />
-                <button onClick={() => { logout(); navigate('/login'); }}
-                  className="w-full flex items-center gap-3 px-4 py-2 text-sm text-red-400 hover:bg-red-500/5 transition-colors">
-                  <LogOut className="w-4 h-4" /> Çıkış Yap
-                </button>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-
-      </div>
-    </aside>
-  );
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // POST CARD
 // ─────────────────────────────────────────────────────────────────────────────
-function PostCard({ post }: { post: (typeof POSTS)[0] }) {
-  const [liked,  setLiked]  = useState(post.liked);
-  const [likes,  setLikes]  = useState(post.likes);
-  const [saved,  setSaved]  = useState(post.bookmarked);
+// ─── COMMENT NODE (Recursive for Reddit-style nesting) ───────────────────────
+export function CommentNode({
+  comment,
+  onReplySubmit,
+  replyingTo,
+  setReplyingTo,
+  replyText,
+  setReplyText,
+  depth = 0,
+}: {
+  comment: CommentResponse;
+  onReplySubmit: (e: React.FormEvent, parentId: string) => void;
+  replyingTo: string | null;
+  setReplyingTo: (id: string | null) => void;
+  replyText: string;
+  setReplyText: (t: string) => void;
+  depth?: number;
+}) {
+  const initials = (comment.author.fullName || comment.author.username).slice(0, 2).toUpperCase();
+  const timeStr = new Date(comment.createdAt).toLocaleDateString('tr-TR', {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
 
   return (
-    <article className="flex gap-3 px-4 py-3.5 transition-colors duration-150 cursor-pointer border-b border-[#ffffff14] hover:bg-white/[0.015]">
-      <Av initials={post.author.initials} color={post.author.color} size={40} className="mt-0.5 flex-shrink-0" />
+    <div className="flex flex-col gap-2 mt-3 select-none" style={{ marginLeft: depth > 0 ? `${Math.min(depth * 12, 36)}px` : 0 }}>
+      <div className="flex gap-2.5 items-start">
+        {depth > 0 && (
+          <div className="w-[1px] self-stretch bg-white/10 -ml-2 mr-1" />
+        )}
+        
+        <Av url={comment.author.avatarUrl} initials={initials} color="#ff7a00" size={depth > 0 ? 28 : 34} />
+        
+        <div className="flex-1 min-w-0 bg-white/[0.02] border border-white/5 rounded-2xl px-3.5 py-2.5">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-[12px] font-bold text-white leading-none">
+              {comment.author.fullName || comment.author.username}
+            </span>
+            <span className="text-[10.5px] text-gray-500">@{comment.author.username}</span>
+            <span className="text-[10px] text-gray-600">·</span>
+            <span className="text-[10.5px] text-gray-500">{timeStr}</span>
+          </div>
+          
+          <p className="mt-1 text-[13px] leading-relaxed text-white/90 whitespace-pre-wrap">{comment.content}</p>
+          
+          {comment.mediaUrl && (
+            <div className="mt-2 rounded-xl overflow-hidden border border-white/5 bg-black/20 max-h-[200px] max-w-[350px]">
+              {comment.mediaType === 'VIDEO' ? (
+                <video
+                  src={comment.mediaUrl}
+                  controls
+                  className="w-full h-full object-cover max-h-[200px] rounded-xl"
+                />
+              ) : (
+                <img
+                  src={comment.mediaUrl}
+                  alt="Comment media"
+                  className="w-full h-full object-cover max-h-[200px] rounded-xl"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).src = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=800&auto=format&fit=crop';
+                  }}
+                />
+              )}
+            </div>
+          )}
+          
+          <div className="flex items-center gap-3 mt-1.5 text-gray-500">
+            <button
+              onClick={() => setReplyingTo(replyingTo === comment.id ? null : comment.id)}
+              className="text-[11px] font-bold text-[#ff7a00] hover:underline transition-all"
+            >
+              Yanıtla
+            </button>
+          </div>
+
+          {replyingTo === comment.id && (
+            <form onSubmit={(e) => onReplySubmit(e, comment.id)} className="mt-3 flex gap-2">
+              <input
+                type="text"
+                value={replyText}
+                onChange={e => setReplyText(e.target.value)}
+                placeholder="Yanıtınızı yazın..."
+                className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#ff7a00]"
+              />
+              <button
+                type="submit"
+                disabled={!replyText.trim()}
+                className="px-4 py-1.5 rounded-xl text-xs font-bold text-white bg-[#ff7a00] hover:bg-[#e86e00] disabled:opacity-40"
+              >
+                Yanıtla
+              </button>
+            </form>
+          )}
+        </div>
+      </div>
+
+      {comment.replies && comment.replies.length > 0 && (
+        <div className="flex flex-col gap-1">
+          {comment.replies.map((reply) => (
+            <CommentNode
+              key={reply.id}
+              comment={reply}
+              onReplySubmit={onReplySubmit}
+              replyingTo={replyingTo}
+              setReplyingTo={setReplyingTo}
+              replyText={replyText}
+              setReplyText={setReplyText}
+              depth={depth + 1}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── REPLY COMMENT MODAL (Twitter/X style reply popup) ──────────────────────
+function ReplyCommentModal({
+  open,
+  onClose,
+  post,
+  user,
+  onCommentCreated,
+}: {
+  open: boolean;
+  onClose: () => void;
+  post: PostResponse;
+  user: AppUser;
+  onCommentCreated: () => void;
+}) {
+  const [text, setText] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  
+  // Medya ve Emoji state'leri
+  const [mediaUrl, setMediaUrl] = useState('');
+  const [mediaType, setMediaType] = useState<'IMAGE' | 'VIDEO'>('IMAGE');
+  const [showMediaInput, setShowMediaInput] = useState(false);
+  const [mediaMode, setMediaMode] = useState<'IMAGE' | 'GIF' | null>(null);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  
+  const ref = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (open) {
+      setTimeout(() => ref.current?.focus(), 80);
+      setError(null);
+    } else {
+      setText('');
+      setMediaUrl('');
+      setMediaType('IMAGE');
+      setShowMediaInput(false);
+      setMediaMode(null);
+      setShowEmojiPicker(false);
+    }
+  }, [open]);
+
+  if (!open) return null;
+
+  const initials = (post.author.fullName || post.author.username).slice(0, 2).toUpperCase();
+  const userInitials = (user.fullName || user.username).slice(0, 2).toUpperCase();
+
+  // Medya varsa sonuna pic.x.com linki ekleme
+  const getFormattedContent = () => {
+    if (!post.media || post.media.length === 0) return post.content;
+    const mediaId = post.media[0].id.replace(/-/g, '').substring(0, 10);
+    return `${post.content} pic.x.com/${mediaId}`;
+  };
+
+  const timeStr = new Date(post.createdAt).toLocaleDateString('tr-TR', {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+
+  const handleToggleImage = () => {
+    setShowEmojiPicker(false);
+    if (showMediaInput && mediaMode === 'IMAGE') {
+      setShowMediaInput(false);
+      setMediaMode(null);
+    } else {
+      setShowMediaInput(true);
+      setMediaMode('IMAGE');
+      setMediaType('IMAGE');
+    }
+  };
+
+  const handleToggleGif = () => {
+    setShowEmojiPicker(false);
+    if (showMediaInput && mediaMode === 'GIF') {
+      setShowMediaInput(false);
+      setMediaMode(null);
+    } else {
+      setShowMediaInput(true);
+      setMediaMode('GIF');
+      setMediaType('IMAGE');
+    }
+  };
+
+  const handleToggleEmoji = () => {
+    setShowMediaInput(false);
+    setMediaMode(null);
+    setShowEmojiPicker(prev => !prev);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!text.trim() && !mediaUrl.trim()) return;
+    setLoading(true);
+    setError(null);
+    try {
+      await PostService.createComment(
+        post.id, 
+        text, 
+        undefined, 
+        mediaUrl.trim() ? mediaUrl.trim() : undefined, 
+        mediaUrl.trim() ? mediaType : undefined
+      );
+      onCommentCreated();
+      onClose();
+    } catch (err: any) {
+      console.error('Failed to create comment:', err);
+      setError(err.message || 'Yanıt gönderilirken bir hata oluştu');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 z-50 flex items-start justify-center pt-[10vh] px-4"
+        style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(4px)' }}
+        onClick={(e) => { if (e.target === e.currentTarget && !loading) onClose(); }}
+      >
+        <motion.div
+          initial={{ scale: 0.96, y: -10 }}
+          animate={{ scale: 1, y: 0 }}
+          exit={{ scale: 0.96, y: -10 }}
+          className="w-full max-w-[600px] rounded-2xl overflow-hidden flex flex-col relative"
+          style={{ background: '#000000', border: `1px solid ${T.border}` }}
+        >
+          {/* Top Bar */}
+          <div className="flex items-center justify-between px-4 py-3">
+            <button
+              onClick={onClose}
+              disabled={loading}
+              className="p-1.5 rounded-full hover:bg-white/10 text-white transition-all"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {error && (
+            <div className="px-5 py-2 bg-rose-500/10 text-rose-500 text-xs font-semibold border-b border-rose-500/20">
+              ⚠️ {error}
+            </div>
+          )}
+
+          {/* Body */}
+          <div className="px-5 pt-2 pb-4 flex flex-col overflow-y-auto max-h-[50vh]">
+            {/* Original Post */}
+            <div className="flex gap-3 relative">
+              {/* Vertical Thread Line */}
+              <div className="absolute top-11 bottom-0 left-[20px] w-[2px] bg-neutral-800" />
+              
+              <Av url={post.author.avatarUrl} initials={initials} color="#ff7a00" size={40} className="z-10" />
+              
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-[15px] font-bold text-white leading-tight">
+                    {post.author.fullName || post.author.username}
+                  </span>
+                  <span className="text-[13px] text-gray-500">@{post.author.username}</span>
+                  <span className="text-xs text-gray-600">·</span>
+                  <span className="text-[13px] text-gray-500">{timeStr}</span>
+                </div>
+                <p className="mt-1 text-[15px] leading-relaxed text-white/95 whitespace-pre-wrap select-text">
+                  {getFormattedContent()}
+                </p>
+                
+                <div className="mt-3.5 text-[14px] text-gray-500">
+                  <span className="text-[#ff7a00] hover:underline cursor-pointer">@{post.author.username}</span> adlı kullanıcıya yanıt olarak
+                </div>
+              </div>
+            </div>
+
+            {/* My Reply */}
+            <div className="flex gap-3 mt-4 relative">
+              <Av url={user.avatarUrl} initials={userInitials} color="#ff7a00" size={40} className="z-10" />
+              
+              <div className="flex-1">
+                <textarea
+                  ref={ref}
+                  value={text}
+                  onChange={(e) => setText(e.target.value)}
+                  disabled={loading}
+                  placeholder="Yanıtını gönder"
+                  className="w-full bg-transparent resize-none focus:outline-none text-[17px] leading-relaxed py-2 placeholder-gray-600 text-white min-h-[120px]"
+                />
+
+                {/* Yorum Medya Önizlemesi */}
+                {mediaUrl && (
+                  <div className="relative mt-2 rounded-xl overflow-hidden border border-white/10 bg-black/40 max-h-[160px] self-start inline-block">
+                    <img
+                      src={mediaUrl}
+                      alt="Reply media preview"
+                      className="max-h-[160px] object-contain rounded-xl"
+                      onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).src = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=800&auto=format&fit=crop';
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setMediaUrl('')}
+                      className="absolute top-1.5 right-1.5 p-1 bg-black/70 hover:bg-black text-white rounded-full transition-all"
+                      title="Medyayı kaldır"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Media Input Area */}
+          {showMediaInput && (
+            <div className="px-5 pb-3 border-t border-white/5 pt-3">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={mediaUrl}
+                  onChange={e => setMediaUrl(e.target.value)}
+                  disabled={loading}
+                  placeholder={mediaMode === 'GIF' ? "GIF URL'si ekleyin (örn. https://...)" : "Görsel veya video URL'si ekleyin (örn. https://...)"}
+                  className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-[#ff7a00] disabled:opacity-55"
+                />
+                <select
+                  value={mediaType}
+                  onChange={e => setMediaType(e.target.value as 'IMAGE' | 'VIDEO')}
+                  disabled={loading}
+                  className="bg-[#000] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#ff7a00] cursor-pointer disabled:opacity-55"
+                >
+                  <option value="IMAGE">Resim / GIF</option>
+                  <option value="VIDEO">Video</option>
+                </select>
+              </div>
+              
+              {mediaMode === 'GIF' && (
+                <div className="mt-3">
+                  <p className="text-[11px] text-gray-500 mb-1.5 font-medium">Hızlı Reaksiyon GIF'leri</p>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { label: '🔥 Harika', url: 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExM2o0bDZ1ZHp4ZzB5ODNpeGZhc3Y2N2x2dWx5ZXo4MnFmNjB1d3pwMyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/l3q2K1M66DFgt5hAI/giphy.gif' },
+                      { label: '😂 LOL', url: 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExMmlkNXlhcG9qbm82d2NseXg0OXVzOTc4NDhpeDFtdWkyZHdqNjVydCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/c8UN4CgRenjQA/giphy.gif' },
+                      { label: '👍 Süper', url: 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExMm1mMGVydTNyOHVyNHk2b2E0d3F0N3J0ZGVvY3I3N3ltbnpxYjZiaSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/3o7absbD718RL7MLx6/giphy.gif' },
+                      { label: '🤯 Şok', url: 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExbDVqdzJ5NHBqMndjNnhscTFhbXRrcTZxMXdweGxxajN1bmt5NHV5ciZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/2rqDfPukWT4yc/giphy.gif' },
+                      { label: '🤦‍♂️ Yapma', url: 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExbndqMnJmdzFtbG02ejBvMXh1d3J2NnkyYzg2ZWVjMTd3cmphOGoxciZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/3og0INyM8CgUMLLmeQ/giphy.gif' }
+                    ].map((gif) => (
+                      <button
+                        key={gif.label}
+                        type="button"
+                        onClick={() => {
+                          setMediaUrl(gif.url);
+                          setMediaType('IMAGE');
+                        }}
+                        className="px-2.5 py-1 rounded-full text-xs bg-white/5 border border-white/10 text-white hover:bg-white/10 hover:border-[#ff7a00] transition-all"
+                      >
+                        {gif.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Emoji Picker Area */}
+          {showEmojiPicker && (
+            <div className="px-5 pb-3 border-t border-white/5 pt-3">
+              <p className="text-[11px] text-gray-500 mb-2 font-medium">Hızlı Emojiler</p>
+              <div className="grid grid-cols-8 gap-2 bg-white/5 p-2 rounded-xl border border-white/10">
+                {['😀', '😂', '🤣', '😊', '😍', '😘', '😜', '😎', '🤔', '🙄', '😭', '😱', '😡', '👍', '👎', '❤️', '🔥', '✨', '🎉', '👏', '🚀', '💯'].map((emoji) => (
+                  <button
+                    key={emoji}
+                    type="button"
+                    onClick={() => {
+                      setText(prev => prev + emoji);
+                      ref.current?.focus();
+                    }}
+                    className="text-xl p-1.5 rounded-lg hover:bg-white/10 transition-all active:scale-90 flex items-center justify-center"
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Bottom Bar / Action Icons */}
+          <div className="flex items-center justify-between px-4 py-3 border-t border-white/10" style={{ background: '#000000' }}>
+            <div className="flex items-center gap-0.5 text-[#ff7a00]">
+              <button 
+                type="button" 
+                onClick={handleToggleImage}
+                className={`p-2 rounded-full hover:bg-[#ff7a00]/10 transition-all ${mediaMode === 'IMAGE' ? 'text-white bg-[#ff7a00]/20' : ''}`}
+                title="Görsel ekle"
+              >
+                <ImageIcon className="w-[19px] h-[19px]" />
+              </button>
+              <button 
+                type="button" 
+                onClick={handleToggleGif}
+                className={`px-2 py-2 rounded-full hover:bg-[#ff7a00]/10 transition-all font-bold text-[11px] leading-none ${mediaMode === 'GIF' ? 'text-white bg-[#ff7a00]/20' : ''}`}
+                title="GIF ekle"
+              >
+                GIF
+              </button>
+              <button 
+                type="button" 
+                onClick={handleToggleEmoji}
+                className={`p-2 rounded-full hover:bg-[#ff7a00]/10 transition-all ${showEmojiPicker ? 'text-white bg-[#ff7a00]/20' : ''}`}
+                title="Emoji ekle"
+              >
+                <Smile className="w-[19px] h-[19px]" />
+              </button>
+            </div>
+            
+            <button
+              onClick={handleSubmit}
+              disabled={(!text.trim() && !mediaUrl.trim()) || loading}
+              className="px-5 py-2 rounded-full text-[14px] font-bold text-white transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{
+                background: (text.trim() || mediaUrl.trim()) ? '#ff7a00' : 'rgba(255,122,0,0.35)',
+                color: (text.trim() || mediaUrl.trim()) ? '#ffffff' : 'rgba(255,255,255,0.5)'
+              }}
+            >
+              {loading ? 'Yanıtlanıyor...' : 'Yanıtla'}
+            </button>
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  );
+}
+
+// ─── POST CARD ─────────────────────────────────────────────────────────────
+export function PostCard({ post }: { post: PostResponse }) {
+  const storeUser = useStore(s => s.user);
+  const user = (storeUser ?? MOCK_USER) as AppUser;
+  const navigate = useNavigate();
+
+  const initialLiked = post.reactions ? post.reactions.some(r => r.userId === user.id && r.reactionType === 'LIKE') : false;
+  const [liked,  setLiked]  = useState(initialLiked);
+  const [likes,  setLikes]  = useState(post.reactionCount);
+  const [saved,  setSaved]  = useState(false);
+
+  useEffect(() => {
+    const hasLiked = post.reactions ? post.reactions.some(r => r.userId === user.id && r.reactionType === 'LIKE') : false;
+    setLiked(hasLiked);
+    setLikes(post.reactionCount);
+  }, [post.reactions, post.reactionCount, user.id]);
+
+  const handleLike = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const newLiked = !liked;
+    setLiked(newLiked);
+    setLikes(prev => newLiked ? prev + 1 : prev - 1);
+    try {
+      await PostService.toggleReaction(post.id, 'LIKE');
+    } catch (err) {
+      console.error('Failed to toggle post reaction:', err);
+      setLiked(liked);
+      setLikes(likes);
+    }
+  };
+
+  const [showComments, setShowComments] = useState(false);
+  const [commentModalOpen, setCommentModalOpen] = useState(false);
+  const [comments, setComments] = useState<CommentResponse[]>([]);
+  const [commentsLoading, setCommentsLoading] = useState(false);
+  const [newCommentText, setNewCommentText] = useState('');
+  const [commentsCount, setCommentsCount] = useState(post.commentCount);
+  const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState('');
+
+  const initials = (post.author.fullName || post.author.username).slice(0, 2).toUpperCase();
+  const color = '#ff7a00';
+
+  const timeStr = new Date(post.createdAt).toLocaleDateString('tr-TR', {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+
+  const fetchComments = async () => {
+    try {
+      setCommentsLoading(true);
+      const data = await PostService.getComments(post.id);
+      setComments(data);
+    } catch (err) {
+      console.error('Failed to fetch comments:', err);
+    } finally {
+      setCommentsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (showComments) {
+      fetchComments();
+    }
+  }, [showComments]);
+
+  const handleAddComment = async (e: React.FormEvent, parentCommentId?: string) => {
+    e.preventDefault();
+    const text = parentCommentId ? replyText : newCommentText;
+    if (!text.trim()) return;
+
+    try {
+      await PostService.createComment(post.id, text, parentCommentId);
+      if (parentCommentId) {
+        setReplyText('');
+        setReplyingTo(null);
+      } else {
+        setNewCommentText('');
+      }
+      setCommentsCount(prev => prev + 1);
+      await fetchComments();
+    } catch (err) {
+      console.error('Failed to add comment:', err);
+    }
+  };
+
+  return (
+    <article 
+      onClick={() => navigate(`/posts/${post.id}`)}
+      className="flex gap-3 px-4 py-3.5 transition-colors duration-150 cursor-pointer border-b border-[#ffffff14] hover:bg-white/[0.015]"
+    >
+      <div onClick={(e) => { e.stopPropagation(); navigate(`/@${post.author.username}`); }} className="mt-0.5 flex-shrink-0 cursor-pointer">
+        <Av url={post.author.avatarUrl} initials={initials} color={color} size={40} className="hover:opacity-85 transition-opacity" />
+      </div>
       <div className="flex-1 min-w-0">
         {/* Header */}
         <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="text-[14px] font-bold text-white hover:underline">{post.author.name}</span>
-          {post.author.verified && (
-            <span className="inline-flex items-center justify-center w-[14px] h-[14px] rounded-full flex-shrink-0 bg-[#ff7a00]">
-              <svg className="w-2 h-2 text-white" fill="currentColor" viewBox="0 0 12 12">
-                <path d="M10.28 2.28L3.989 8.575 1.695 6.28A1 1 0 00.28 7.695l3 3a1 1 0 001.414 0l7-7A1 1 0 0010.28 2.28z" />
-              </svg>
-            </span>
-          )}
-          <span className="text-[13px] text-gray-500">@{post.author.handle}</span>
+          <span onClick={(e) => { e.stopPropagation(); navigate(`/@${post.author.username}`); }} className="text-[14px] font-bold text-white hover:underline cursor-pointer">{post.author.fullName || post.author.username}</span>
+          <span onClick={(e) => { e.stopPropagation(); navigate(`/@${post.author.username}`); }} className="text-[13px] text-gray-500 hover:underline cursor-pointer">@{post.author.username}</span>
           <span className="text-xs text-gray-600">·</span>
-          <span className="text-[13px] text-gray-500">{post.time}</span>
+          <span className="text-[13px] text-gray-500">{timeStr}</span>
+          {post.community && (
+            <>
+              <span className="text-xs text-gray-600">·</span>
+              <span className="text-[12px] text-[#ff7a00] font-semibold hover:underline">
+                c/{post.community.name}
+              </span>
+            </>
+          )}
         </div>
 
         {/* Content */}
-        <p className="mt-1 text-[14px] leading-normal text-white/90">{post.content}</p>
+        <p className="mt-1 text-[14px] leading-normal text-white/90 whitespace-pre-wrap">{post.content}</p>
+
+        {/* Media Render */}
+        {post.media && post.media.length > 0 && (
+          <div className="mt-3 grid gap-2 rounded-xl overflow-hidden border border-white/5 bg-black/20 max-h-[350px]">
+            {post.media.map((med) => {
+              if (med.mediaType === 'IMAGE') {
+                return (
+                  <img
+                    key={med.id}
+                    src={med.mediaUrl}
+                    alt="Post media"
+                    className="w-full h-full object-cover max-h-[350px] rounded-xl"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).src = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=800&auto=format&fit=crop';
+                    }}
+                  />
+                );
+              } else if (med.mediaType === 'VIDEO') {
+                return (
+                  <video
+                    key={med.id}
+                    src={med.mediaUrl}
+                    controls
+                    className="w-full h-full object-cover max-h-[350px] rounded-xl"
+                  />
+                );
+              }
+              return null;
+            })}
+          </div>
+        )}
 
         {/* Actions */}
         <div className="flex items-center justify-between mt-3 max-w-[420px] -ml-2 text-gray-500">
-          <ActBtn icon={<MessageCircle className="w-[18px] h-[18px]" />} count={post.comments} hov="rgba(29,155,240,0.1)" hovC="#1d9bf0" />
-          <ActBtn icon={<Repeat2 className="w-[18px] h-[18px]" />} count={post.reposts} hov="rgba(0,186,124,0.1)" hovC="#00ba7c" />
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setCommentModalOpen(true);
+              setShowComments(true);
+            }}
+            className="flex items-center gap-1.5 p-2 rounded-full text-xs font-medium transition-colors hover:text-white"
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(29,155,240,0.1)"; (e.currentTarget as HTMLElement).style.color = "#1d9bf0"; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = ''; }}
+          >
+            <MessageCircle className="w-[18px] h-[18px]" />
+            <span>{fmt(commentsCount)}</span>
+          </button>
+
+          <ActBtn icon={<Repeat2 className="w-[18px] h-[18px]" />} count={0} hov="rgba(0,186,124,0.1)" hovC="#00ba7c" />
           
-          <button onClick={(e) => { e.stopPropagation(); setLiked(l => { setLikes(c => l ? c - 1 : c + 1); return !l; }); }}
+          <button onClick={handleLike}
             className="flex items-center gap-1.5 p-2 rounded-full hover:bg-rose-500/10 hover:text-rose-500 transition-colors text-xs font-medium"
             style={{ color: liked ? '#f43f5e' : undefined }}>
             <Heart className={`w-[18px] h-[18px] ${liked ? 'fill-rose-500 text-rose-500' : ''}`} />
@@ -320,7 +671,64 @@ function PostCard({ post }: { post: (typeof POSTS)[0] }) {
             <Share2 className="w-[18px] h-[18px]" />
           </button>
         </div>
+
+        {/* Comments Section */}
+        {showComments && (
+          <div className="mt-4 pt-4 border-t border-[#ffffff0a] flex flex-col gap-3" onClick={(e) => e.stopPropagation()}>
+            <h4 className="text-[13px] font-bold text-white">Yorumlar</h4>
+            
+            {/* New Comment Input */}
+            <form onSubmit={(e) => handleAddComment(e)} className="flex gap-2.5 items-end">
+              <input
+                type="text"
+                value={newCommentText}
+                onChange={e => setNewCommentText(e.target.value)}
+                placeholder="Yorumunuzu yazın..."
+                className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-[#ff7a00]"
+              />
+              <button
+                type="submit"
+                disabled={!newCommentText.trim()}
+                className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-[#ff7a00] hover:bg-[#e86e00] disabled:opacity-40"
+              >
+                Gönder
+              </button>
+            </form>
+
+            {/* Comments List */}
+            <div className="mt-2 flex flex-col gap-2">
+              {commentsLoading ? (
+                <p className="text-center text-xs text-gray-500 py-4">Yorumlar yükleniyor...</p>
+              ) : comments.length === 0 ? (
+                <p className="text-center text-xs text-gray-500 py-4">Henüz yorum yapılmamış. İlk yorumu siz yazın!</p>
+              ) : (
+                comments.map((comment) => (
+                  <CommentNode
+                    key={comment.id}
+                    comment={comment}
+                    onReplySubmit={handleAddComment}
+                    replyingTo={replyingTo}
+                    setReplyingTo={setReplyingTo}
+                    replyText={replyText}
+                    setReplyText={setReplyText}
+                  />
+                ))
+              )}
+            </div>
+          </div>
+        )}
       </div>
+      <ReplyCommentModal
+        open={commentModalOpen}
+        onClose={() => setCommentModalOpen(false)}
+        post={post}
+        user={user}
+        onCommentCreated={async () => {
+          setCommentsCount(prev => prev + 1);
+          setShowComments(true);
+          await fetchComments();
+        }}
+      />
     </article>
   );
 }
@@ -360,12 +768,6 @@ function ComposeCard({ user, onOpen }: { user: AppUser; onOpen: () => void }) {
             <button onClick={onOpen} className="p-2 rounded-full hover:bg-white/5 text-[#ff7a00] transition-colors" title="Emoji ekle">
               <Smile className="w-[18px] h-[18px]" />
             </button>
-            {/* Community selector */}
-            <div onClick={onOpen} className="flex items-center gap-1.5 px-3 py-1 rounded-full border border-white/10 hover:border-[#ff7a00]/30 hover:text-white text-gray-400 text-[13px] cursor-pointer transition-all">
-              <Hash className="w-3.5 h-3.5" />
-              <span>Topluluk Seç</span>
-              <ChevronDown className="w-3 h-3" />
-            </div>
           </div>
           <button onClick={onOpen} className="px-5 py-1.5 rounded-full text-sm font-bold text-white bg-[#ff7a00] hover:bg-[#e86e00] transition-all">
             Paylaş
@@ -379,18 +781,57 @@ function ComposeCard({ user, onOpen }: { user: AppUser; onOpen: () => void }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // COMPOSE MODAL
 // ─────────────────────────────────────────────────────────────────────────────
-function ComposeModal({ open, onClose, user }: { open: boolean; onClose: () => void; user: AppUser }) {
+function ComposeModal({ open, onClose, user, onPostCreated }: { open: boolean; onClose: () => void; user: AppUser; onPostCreated: () => void }) {
   const [text, setText] = useState('');
+  const [mediaUrl, setMediaUrl] = useState('');
+  const [mediaType, setMediaType] = useState<'IMAGE' | 'VIDEO'>('IMAGE');
+  const [showMediaInput, setShowMediaInput] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
   const ref  = useRef<HTMLTextAreaElement>(null);
   const MAX  = 280;
 
   useEffect(() => {
-    if (open) setTimeout(() => ref.current?.focus(), 80);
-    else setText('');
+    if (open) {
+      setTimeout(() => ref.current?.focus(), 80);
+      setError(null);
+    } else {
+      setText('');
+      setMediaUrl('');
+      setMediaType('IMAGE');
+      setShowMediaInput(false);
+    }
   }, [open]);
 
   const initials = (user.fullName || user.username).slice(0, 2).toUpperCase();
   const left = MAX - text.length;
+
+  const handlePublish = async () => {
+    if (!text.trim()) return;
+    setLoading(true);
+    setError(null);
+    try {
+      // 1. Gönderiyi oluştur
+      const post = await PostService.create({ content: text });
+      
+      // 2. Eğer medya URL'si girilmişse medyayı ekle
+      if (mediaUrl.trim()) {
+        await PostService.addMedia(post.id, {
+          mediaUrl: mediaUrl.trim(),
+          mediaType: mediaType,
+        });
+      }
+      
+      onPostCreated();
+      onClose();
+    } catch (err: any) {
+      console.error('Failed to publish post:', err);
+      setError(err.message || 'Gönderi paylaşılırken bir hata oluştu');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <AnimatePresence>
@@ -399,44 +840,84 @@ function ComposeModal({ open, onClose, user }: { open: boolean; onClose: () => v
           transition={{ duration: 0.15 }}
           className="fixed inset-0 z-50 flex items-start justify-center pt-[8vh] px-4"
           style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)' }}
-          onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+          onClick={e => { if (e.target === e.currentTarget && !loading) onClose(); }}>
           <motion.div initial={{ scale: 0.96, y: -14, opacity: 0 }} animate={{ scale: 1, y: 0, opacity: 1 }}
             exit={{ scale: 0.96, y: -6, opacity: 0 }}
             transition={{ type: 'spring', stiffness: 350, damping: 32 }}
             className="w-full max-w-[560px] rounded-2xl shadow-2xl overflow-hidden"
             style={{ background: '#0f0f0f', border: `1px solid ${T.border}` }}>
+            
+            {/* Header */}
             <div className="flex items-center justify-between px-5 pt-5 pb-4"
               style={{ borderBottom: `1px solid ${T.border}` }}>
               <span className="custom-font-serif text-[16px] font-light" style={{ color: T.muted }}>
                 Yeni Gönderi
               </span>
-              <button onClick={onClose}
-                className="p-1.5 rounded-full transition-all"
+              <button onClick={onClose} disabled={loading}
+                className="p-1.5 rounded-full transition-all disabled:opacity-30"
                 style={{ color: T.mutedLo }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = T.text; (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.06)'; }}
+                onMouseEnter={e => { if (!loading) { (e.currentTarget as HTMLElement).style.color = T.text; (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.06)'; } }}
                 onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = T.mutedLo; (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
                 <X className="w-4 h-4" />
               </button>
             </div>
 
+            {/* Error Message */}
+            {error && (
+              <div className="px-5 pt-3 text-red-500 text-xs font-semibold">
+                ⚠️ {error}
+              </div>
+            )}
+
+            {/* Textarea */}
             <div className="flex gap-3 px-5 py-4">
               <Av url={user.avatarUrl} initials={initials} color={T.accent} size={40} className="mt-0.5" />
-              <textarea ref={ref} value={text} onChange={e => setText(e.target.value)}
+              <textarea ref={ref} value={text} onChange={e => setText(e.target.value)} disabled={loading}
                 placeholder="Ne paylaşmak istiyorsun?" rows={5}
-                className="flex-1 bg-transparent resize-none focus:outline-none text-[15px] leading-relaxed"
+                className="flex-1 bg-transparent resize-none focus:outline-none text-[15px] leading-relaxed disabled:opacity-55"
                 style={{ color: 'rgba(255,255,255,0.85)', caretColor: T.accent }}
               />
             </div>
 
+            {/* Media Input Area */}
+            {showMediaInput && (
+              <div className="px-5 pb-4 flex flex-col gap-2">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={mediaUrl}
+                    onChange={e => setMediaUrl(e.target.value)}
+                    disabled={loading}
+                    placeholder="Görsel veya video URL'si ekleyin (örn. https://...)"
+                    className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-[#ff7a00] disabled:opacity-55"
+                  />
+                  <select
+                    value={mediaType}
+                    onChange={e => setMediaType(e.target.value as 'IMAGE' | 'VIDEO')}
+                    disabled={loading}
+                    className="bg-[#0f0f0f] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#ff7a00] cursor-pointer disabled:opacity-55"
+                  >
+                    <option value="IMAGE">Resim</option>
+                    <option value="VIDEO">Video</option>
+                  </select>
+                </div>
+              </div>
+            )}
+
+            {/* Footer */}
             <div className="flex items-center justify-between px-5 py-4" style={{ borderTop: `1px solid ${T.border}` }}>
               <div className="flex items-center gap-1">
-                <button className="p-2 rounded-full text-[#ff7a00] hover:bg-white/5 transition-all">
+                <button
+                  type="button"
+                  disabled={loading}
+                  onClick={() => setShowMediaInput(p => !p)}
+                  className={`p-2 rounded-full hover:bg-white/5 transition-all disabled:opacity-30 ${showMediaInput ? 'text-[#ff7a00]' : 'text-gray-400'}`}
+                  title="Medya ekle"
+                >
                   <ImageIcon className="w-[18px] h-[18px]" />
                 </button>
-                <button className="p-2 rounded-full text-[#ff7a00] hover:bg-white/5 transition-all">
-                  <Smile className="w-[18px] h-[18px]" />
-                </button>
               </div>
+              
               <div className="flex items-center gap-3">
                 {text.length > 0 && (
                   <span className="text-[12px] font-medium"
@@ -444,12 +925,14 @@ function ComposeModal({ open, onClose, user }: { open: boolean; onClose: () => v
                     {left}
                   </span>
                 )}
-                <button disabled={!text.trim() || left < 0}
+                <button
+                  disabled={!text.trim() || left < 0 || loading}
+                  onClick={handlePublish}
                   className="px-5 py-2 rounded-full text-[13px] font-bold text-white transition-all active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed"
                   style={{ background: T.accent, boxShadow: `0 2px 12px ${T.accent}30` }}
                   onMouseEnter={e => { if (!e.currentTarget.disabled) (e.currentTarget as HTMLElement).style.background = '#e86e00'; }}
                   onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = T.accent}>
-                  Paylaş
+                  {loading ? 'Paylaşılıyor...' : 'Paylaş'}
                 </button>
               </div>
             </div>
@@ -463,7 +946,7 @@ function ComposeModal({ open, onClose, user }: { open: boolean; onClose: () => v
 // ─────────────────────────────────────────────────────────────────────────────
 // CENTER FEED
 // ─────────────────────────────────────────────────────────────────────────────
-function CenterFeed({ user, onCompose }: { user: AppUser; onCompose: () => void }) {
+function CenterFeed({ user, onCompose, posts, loading }: { user: AppUser; onCompose: () => void; posts: PostResponse[]; loading: boolean }) {
   const [activeTab, setActiveTab] = useState<'for-you' | 'following'>('for-you');
 
   return (
@@ -513,152 +996,29 @@ function CenterFeed({ user, onCompose }: { user: AppUser; onCompose: () => void 
 
       {/* Posts */}
       <div className="flex flex-col w-full pb-20">
-        {POSTS.map((p) => (
-          <PostCard key={p.id} post={p} />
-        ))}
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-12 gap-3">
+            <div className="w-8 h-8 rounded-full border-2 border-t-[#ff7a00] border-r-transparent border-b-transparent border-l-transparent animate-spin" />
+            <p className="text-xs text-gray-500 font-medium">Gönderiler yükleniyor...</p>
+          </div>
+        ) : posts.length === 0 ? (
+          <div className="text-center py-16 px-4">
+            <Sparkles className="w-8 h-8 text-[#ff7a00]/40 mx-auto mb-3" />
+            <p className="text-[14px] font-bold text-white mb-1">Henüz gönderi yok</p>
+            <p className="text-[12px] text-gray-500 max-w-[280px] mx-auto leading-relaxed">
+              Bu toplulukta veya akışta henüz hiç gönderi paylaşılmamış. İlk gönderiyi sen paylaş!
+            </p>
+          </div>
+        ) : (
+          posts.map((p) => (
+            <PostCard key={p.id} post={p} />
+          ))
+        )}
       </div>
     </div>
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// RIGHT SIDEBAR
-// ─────────────────────────────────────────────────────────────────────────────
-function RightSidebar({ user }: { user: AppUser }) {
-  const navigate = useNavigate();
-  const [search, setSearch] = useState('');
-  const [follows, setFollows] = useState<Record<string, boolean>>(
-    Object.fromEntries(USERS.map(u => [u.id, u.following]))
-  );
-  const [joins, setJoins] = useState<Record<string, boolean>>(
-    Object.fromEntries(COMMUNITIES.map(c => [c.id, c.joined]))
-  );
-
-  const initials = (user.fullName || user.username).slice(0, 2).toUpperCase();
-  const filtered = USERS.filter(u =>
-    u.name.toLowerCase().includes(search.toLowerCase()) ||
-    u.handle.toLowerCase().includes(search.toLowerCase())
-  );
-
-  return (
-    <aside className="hidden lg:flex w-[350px] flex-shrink-0 h-screen sticky top-0 flex-col items-start border-l border-[#ffffff14] pl-6 py-4 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-      <div className="w-[310px] flex flex-col gap-4">
-
-        {/* ── PROFİLİM ── */}
-        <Card className="p-4 w-full">
-          <SectionLabel>Profilim</SectionLabel>
-          <div className="flex items-center gap-3 mb-3">
-            <Av url={user.avatarUrl} initials={initials} color={T.accent} size={46} />
-            <div className="flex-1 min-w-0">
-              <p className="text-[14px] font-bold truncate text-white leading-tight">{user.fullName || user.username}</p>
-              <p className="text-[12px] truncate text-gray-500 leading-tight">@{user.username}</p>
-            </div>
-          </div>
-          <button onClick={() => navigate('/profile')}
-            className="w-full py-2 rounded-xl text-[12px] font-semibold transition-all duration-150"
-            style={{ border: `1px solid ${T.border}`, color: T.muted }}
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.2)'; (e.currentTarget as HTMLElement).style.color = T.text; (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.04)'; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = T.border; (e.currentTarget as HTMLElement).style.color = T.muted; (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
-            Profili Görüntüle
-          </button>
-        </Card>
-
-        {/* ── KULLANICILAR ── */}
-        <Card className="p-4 w-full">
-          <SectionLabel>Üyeler</SectionLabel>
-
-          {/* Search */}
-          <div className="relative mb-3.5">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none text-gray-500" />
-            <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Üye ara..."
-              className="w-full rounded-full pl-10 pr-8 py-2 text-[13px] transition-all focus:outline-none focus:bg-black focus:ring-1 focus:ring-[#ff7a00]/30 bg-[#202327] text-white placeholder-gray-500"
-            />
-            {search && (
-              <button onClick={() => setSearch('')} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white">
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
-
-          {/* User list */}
-          <div className="flex flex-col gap-1">
-            {filtered.length === 0 ? (
-              <p className="text-center py-3 text-[12px]" style={{ color: T.mutedLo }}>Kullanıcı bulunamadı</p>
-            ) : filtered.map(u => (
-              <div key={u.id} className="flex items-center gap-2.5 px-1 py-1.5 rounded-xl transition-colors"
-                onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.03)'}
-                onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}>
-                <Av initials={u.initials} color={u.color} size={32} />
-                <div className="flex-1 min-w-0">
-                  <p className="text-[13px] font-semibold truncate text-white leading-tight">{u.name}</p>
-                  <p className="text-[11px] truncate text-gray-500 leading-tight">@{u.handle}</p>
-                </div>
-                <button
-                  onClick={() => setFollows(p => ({ ...p, [u.id]: !p[u.id] }))}
-                  className="flex-shrink-0 text-[11px] font-bold px-3 py-1 rounded-full transition-all duration-150"
-                  style={{
-                    border: `1px solid ${follows[u.id] ? 'rgba(255,255,255,0.1)' : T.border}`,
-                    color: follows[u.id] ? T.mutedLo : T.muted,
-                    background: 'transparent',
-                  }}
-                  onMouseEnter={e => {
-                    (e.currentTarget as HTMLElement).style.borderColor = follows[u.id] ? 'rgba(239,68,68,0.3)' : 'rgba(255,255,255,0.25)';
-                    (e.currentTarget as HTMLElement).style.color = follows[u.id] ? '#f87171' : T.text;
-                  }}
-                  onMouseLeave={e => {
-                    (e.currentTarget as HTMLElement).style.borderColor = follows[u.id] ? 'rgba(255,255,255,0.1)' : T.border;
-                    (e.currentTarget as HTMLElement).style.color = follows[u.id] ? T.mutedLo : T.muted;
-                  }}>
-                  {follows[u.id] ? 'Takipte' : 'Takip Et'}
-                </button>
-              </div>
-            ))}
-          </div>
-        </Card>
-
-        {/* ── TOPLULUKLAR ── */}
-        <Card className="p-4 w-full">
-          <div className="flex items-center justify-between mb-3">
-            <SectionLabel>Topluluklar</SectionLabel>
-            <button className="flex items-center gap-1 text-[11px] font-bold transition-colors text-[#ff7a00] hover:opacity-80">
-              <Plus className="w-3.5 h-3.5" /> Yeni
-            </button>
-          </div>
-
-          <div className="flex flex-col gap-1">
-            {COMMUNITIES.map(c => (
-              <div key={c.id} className="flex items-center gap-2.5 px-1 py-1.5 rounded-xl transition-colors"
-                onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.03)'}
-                onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}>
-                <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
-                  style={{ background: `${c.color}18`, border: `1.5px solid ${c.color}35` }}>
-                  <span style={{ color: c.color, fontSize: 10 }} className="font-bold">{c.initials}</span>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-[13px] font-semibold truncate text-white leading-tight">{c.name}</p>
-                  <p className="text-[11px] text-gray-500 leading-tight">{c.members} üye</p>
-                </div>
-                <button
-                  onClick={() => setJoins(p => ({ ...p, [c.id]: !p[c.id] }))}
-                  className="flex-shrink-0 flex items-center gap-1 text-[11px] font-bold px-3 py-1 rounded-full transition-all duration-150"
-                  style={{
-                    border: `1px solid ${joins[c.id] ? `${c.color}35` : T.border}`,
-                    color: joins[c.id] ? c.color : T.muted,
-                    background: joins[c.id] ? `${c.color}10` : 'transparent',
-                  }}>
-                  {joins[c.id] && <Check className="w-3 h-3" />}
-                  {joins[c.id] ? 'Katıldın' : 'Katıl'}
-                </button>
-              </div>
-            ))}
-          </div>
-        </Card>
-
-        <p className="text-center pb-2 text-[10px] text-gray-600 select-none">© 2026 Gramdit</p>
-      </div>
-    </aside>
-  );
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MAIN — Centered layout, max-w-[1225px]
@@ -667,6 +1027,24 @@ export default function HomePage() {
   const storeUser = useStore(s => s.user);
   const user = (storeUser ?? MOCK_USER) as AppUser;
   const [composeOpen, setComposeOpen] = useState(false);
+  const [posts, setPosts] = useState<PostResponse[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchPosts = async () => {
+    try {
+      setLoading(true);
+      const list = await PostService.getAll();
+      setPosts(list);
+    } catch (err) {
+      console.error('Gönderiler yüklenirken hata oluştu:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPosts();
+  }, []);
 
   return (
     <>
@@ -683,7 +1061,7 @@ export default function HomePage() {
 
           {/* CENTER FEED — scrollable */}
           <main className="w-full max-w-[600px] flex-shrink-1 h-screen overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden border-r border-[#ffffff14] flex flex-col bg-black/10 backdrop-blur-[1px]">
-            <CenterFeed user={user} onCompose={() => setComposeOpen(true)} />
+            <CenterFeed user={user} onCompose={() => setComposeOpen(true)} posts={posts} loading={loading} />
           </main>
 
           {/* RIGHT SIDEBAR */}
@@ -692,7 +1070,7 @@ export default function HomePage() {
         </div>
       </div>
 
-      <ComposeModal open={composeOpen} onClose={() => setComposeOpen(false)} user={user} />
+      <ComposeModal open={composeOpen} onClose={() => setComposeOpen(false)} user={user} onPostCreated={fetchPosts} />
     </>
   );
 }

@@ -15,4 +15,9 @@ export class UpdateProfileDto {
   @IsString()
   @Length(0, 500)
   avatarUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  @Length(0, 500)
+  bannerUrl?: string;
 }

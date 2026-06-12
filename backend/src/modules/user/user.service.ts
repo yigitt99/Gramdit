@@ -20,6 +20,7 @@ export class UserService {
     if (dto.fullName !== undefined) user.fullName = dto.fullName;
     if (dto.bio !== undefined) user.bio = dto.bio;
     if (dto.avatarUrl !== undefined) user.avatarUrl = dto.avatarUrl;
+    if (dto.bannerUrl !== undefined) user.bannerUrl = dto.bannerUrl;
 
     const saved = await this.userRepository.save(user);
 
@@ -30,7 +31,16 @@ export class UserService {
       fullName: saved.fullName,
       bio: saved.bio,
       avatarUrl: saved.avatarUrl,
+      bannerUrl: saved.bannerUrl,
+      followerCount: saved.followerCount,
+      followingCount: saved.followingCount,
     };
+  }
+
+  async findByUsername(username: string) {
+    const user = await this.userRepository.findOne({ where: { username } });
+    if (!user) throw new NotFoundException('User not found');
+    return user;
   }
 
   async findById(userId: string) {

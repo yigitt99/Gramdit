@@ -2,6 +2,9 @@ import { Routes, Route } from 'react-router-dom';
 import { Suspense, useEffect } from 'react';
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
+import CommunityPage from './pages/CommunityPage';
+import PostDetailPage from './pages/PostDetailPage';
+import ProfilePage from './pages/ProfilePage';
 import ProtectedRoute from './components/ProtectedRoute';
 import { WebGLShader } from './components/ui/web-gl-shader';
 import useStore from './store';
@@ -55,11 +58,21 @@ function App() {
               </ProtectedRoute>
             } />
 
-            <Route path="/profile" element={
+            <Route path="/communities/:slug" element={
               <ProtectedRoute>
-                <div className="flex items-center justify-center min-h-screen text-white text-xl">
-                  Profile Page (Placeholder)
-                </div>
+                <CommunityPage />
+              </ProtectedRoute>
+            } />
+
+            <Route path="/posts/:id" element={
+              <ProtectedRoute>
+                <PostDetailPage />
+              </ProtectedRoute>
+            } />
+
+            <Route path="/:username" element={
+              <ProtectedRoute>
+                <ProfilePage />
               </ProtectedRoute>
             } />
 
