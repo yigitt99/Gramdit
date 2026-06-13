@@ -1,10 +1,13 @@
 import apiClient from '../api/client';
 
 export interface UpdateProfileData {
+  username?: string;
   fullName?: string;
   bio?: string;
+  website?: string;
   avatarUrl?: string;
   bannerUrl?: string;
+  isPrivate?: boolean;
 }
 
 export interface ProfileResponse {
@@ -13,11 +16,13 @@ export interface ProfileResponse {
   email?: string;
   fullName: string | null;
   bio: string | null;
+  website: string | null;
   avatarUrl: string | null;
   bannerUrl: string | null;
   createdAt?: string;
   followerCount?: number;
   followingCount?: number;
+  isPrivate?: boolean;
 }
 
 export interface FollowUserResponse {
@@ -33,6 +38,8 @@ export interface FollowUserResponse {
 export interface FollowStatusResponse {
   isFollowing: boolean;
   isFollowedBy: boolean;
+  isRequestSent: boolean;
+  isRequestReceived: boolean;
 }
 
 const UserService = {
@@ -56,17 +63,25 @@ const UserService = {
     });
   },
 
+  async uploadBanner(formData: FormData): Promise<{ bannerUrl: string }> {
+    return apiClient.post<{ bannerUrl: string }>('/users/banner', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+  },
+
   async getUsers(search?: string): Promise<FollowUserResponse[]> {
     return apiClient.get<FollowUserResponse[]>('/users', { params: { search } });
   },
 
   /** POST /users/:id/follow */
-  async follow(userId: string): Promise<{ success: boolean; isFollowing: boolean }> {
+  async follow(userId: string): Promise<{ success: boolean; isFollowing: boolean; isRequestSent: boolean }> {
     return apiClient.post(`/users/${userId}/follow`);
   },
 
   /** DELETE /users/:id/follow */
-  async unfollow(userId: string): Promise<{ success: boolean; isFollowing: boolean }> {
+  async unfollow(userId: string): Promise<{ success: boolean; isFollowing: boolean; isRequestSent: boolean }> {
     return apiClient.delete(`/users/${userId}/follow`);
   },
 
@@ -83,6 +98,21 @@ const UserService = {
   /** GET /users/:id/follow-status */
   async getFollowStatus(userId: string): Promise<FollowStatusResponse> {
     return apiClient.get<FollowStatusResponse>(`/users/${userId}/follow-status`);
+  },
+
+  /** GET /users/me/follow-requests */
+  async getFollowRequests(): Promise<any[]> {
+    return apiClient.get<any[]>('/users/me/follow-requests');
+  },
+
+  /** POST /users/me/follow-requests/:requestId/accept */
+  async acceptFollowRequest(requestId: string): Promise<any> {
+    return apiClient.post(`/users/me/follow-requests/${requestId}/accept`);
+  },
+
+  /** POST /users/me/follow-requests/:requestId/reject */
+  async rejectFollowRequest(requestId: string): Promise<any> {
+    return apiClient.post(`/users/me/follow-requests/${requestId}/reject`);
   },
 };
 

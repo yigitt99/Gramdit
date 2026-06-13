@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Follow } from './entities/follow.entity';
+import { FollowRequest } from './entities/follow-request.entity';
 import { User } from '../user/entities/user.entity';
 import { NotificationService } from '../notification/notification.service';
 import { NotificationType } from '../notification/enums/notification-type.enum';
@@ -11,13 +12,15 @@ export class FollowService {
   constructor(
     @InjectRepository(Follow)
     private readonly followRepository: Repository<Follow>,
+    @InjectRepository(FollowRequest)
+    private readonly followRequestRepository: Repository<FollowRequest>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
     private readonly notificationService: NotificationService,
   ) {}
 
-  /** Kullanıcıyı takip et */
-  async follow(followingId: string, followerId: string): Promise<{ success: boolean; isFollowing: boolean }> {
+  /** Kullanıcıyı takip et veya istek gönder */
+  async follow(followingId: string, followerId: string): Promise<{ success: boolean; isFollowing: boolean; isRequestSent: boolean }> {
     if (followerId === followingId) {
       throw new BadRequestException('Kendinizi takip edemezsiniz');
     }
@@ -27,12 +30,42 @@ export class FollowService {
       throw new NotFoundException('Takip edilecek kullanıcı bulunamadı');
     }
 
-    const existing = await this.followRepository.findOne({
+    const existingFollow = await this.followRepository.findOne({
       where: { followerId, followingId },
     });
 
-    if (existing) {
+    if (existingFollow) {
       throw new BadRequestException('Bu kullanıcıyı zaten takip ediyorsunuz');
+    }
+
+    const existingRequest = await this.followRequestRepository.findOne({
+      where: { senderId: followerId, recipientId: followingId },
+    });
+
+    // Eğer targetUser gizli (private) hesapsa:
+    if (targetUser.isPrivate) {
+      if (existingRequest) {
+        throw new BadRequestException('Takip isteği zaten gönderilmiş');
+      }
+      const newRequest = this.followRequestRepository.create({
+        senderId: followerId,
+        recipientId: followingId,
+      });
+      await this.followRequestRepository.save(newRequest);
+
+      // Bildirim oluştur (takip isteği alan kişiye)
+      await this.notificationService.create({
+        recipientId: followingId,
+        senderId: followerId,
+        type: NotificationType.FOLLOW_REQUEST,
+      });
+
+      return { success: true, isFollowing: false, isRequestSent: true };
+    }
+
+    // Eğer targetUser açık (public) hesapsa:
+    if (existingRequest) {
+      await this.followRequestRepository.remove(existingRequest);
     }
 
     const newFollow = this.followRepository.create({ followerId, followingId });
@@ -46,14 +79,24 @@ export class FollowService {
       type: NotificationType.FOLLOW,
     });
 
-    return { success: true, isFollowing: true };
+    return { success: true, isFollowing: true, isRequestSent: false };
   }
 
-  /** Takibi bırak */
-  async unfollow(followingId: string, followerId: string): Promise<{ success: boolean; isFollowing: boolean }> {
+  /** Takibi bırak veya isteği iptal et */
+  async unfollow(followingId: string, followerId: string): Promise<{ success: boolean; isFollowing: boolean; isRequestSent: boolean }> {
     const targetUser = await this.userRepository.findOne({ where: { id: followingId } });
     if (!targetUser) {
       throw new NotFoundException('Kullanıcı bulunamadı');
+    }
+
+    // Bekleyen takip isteği var mı?
+    const followRequest = await this.followRequestRepository.findOne({
+      where: { senderId: followerId, recipientId: followingId },
+    });
+
+    if (followRequest) {
+      await this.followRequestRepository.remove(followRequest);
+      return { success: true, isFollowing: false, isRequestSent: false };
     }
 
     const followRecord = await this.followRepository.findOne({
@@ -67,7 +110,7 @@ export class FollowService {
     await this.followRepository.remove(followRecord);
     await this.updateCounts(followerId, followingId);
 
-    return { success: true, isFollowing: false };
+    return { success: true, isFollowing: false, isRequestSent: false };
   }
 
   /** Takipçi listesi */
@@ -116,20 +159,98 @@ export class FollowService {
   async getFollowStatus(
     currentUserId: string,
     targetUserId: string,
-  ): Promise<{ isFollowing: boolean; isFollowedBy: boolean }> {
-    const [isFollowing, isFollowedBy] = await Promise.all([
+  ): Promise<{ isFollowing: boolean; isFollowedBy: boolean; isRequestSent: boolean; isRequestReceived: boolean }> {
+    const [isFollowing, isFollowedBy, requestSent, requestReceived] = await Promise.all([
       this.followRepository.findOne({
         where: { followerId: currentUserId, followingId: targetUserId },
       }),
       this.followRepository.findOne({
         where: { followerId: targetUserId, followingId: currentUserId },
       }),
+      this.followRequestRepository.findOne({
+        where: { senderId: currentUserId, recipientId: targetUserId },
+      }),
+      this.followRequestRepository.findOne({
+        where: { senderId: targetUserId, recipientId: currentUserId },
+      }),
     ]);
 
     return {
       isFollowing: !!isFollowing,
       isFollowedBy: !!isFollowedBy,
+      isRequestSent: !!requestSent,
+      isRequestReceived: !!requestReceived,
     };
+  }
+
+  /** Gelen takip istekleri listesi */
+  async getFollowRequests(recipientId: string): Promise<any[]> {
+    const list = await this.followRequestRepository.find({
+      where: { recipientId },
+      relations: ['sender'],
+      order: { createdAt: 'DESC' },
+    });
+
+    return list.map(item => ({
+      id: item.id,
+      sender: {
+        id: item.sender.id,
+        username: item.sender.username,
+        fullName: item.sender.fullName,
+        avatarUrl: item.sender.avatarUrl,
+      },
+      createdAt: item.createdAt,
+    }));
+  }
+
+  /** Takip isteğini kabul et */
+  async acceptFollowRequest(requestId: string, recipientId: string): Promise<{ success: boolean }> {
+    const request = await this.followRequestRepository.findOne({
+      where: { id: requestId, recipientId },
+      relations: ['sender'],
+    });
+
+    if (!request) {
+      throw new NotFoundException('Takip isteği bulunamadı');
+    }
+
+    const followerId = request.senderId;
+    const followingId = recipientId;
+
+    const existing = await this.followRepository.findOne({
+      where: { followerId, followingId },
+    });
+
+    if (!existing) {
+      const newFollow = this.followRepository.create({ followerId, followingId });
+      await this.followRepository.save(newFollow);
+      await this.updateCounts(followerId, followingId);
+
+      // Takipçi bildirimini gönder
+      await this.notificationService.create({
+        recipientId: followerId,
+        senderId: followingId,
+        type: NotificationType.FOLLOW,
+      });
+    }
+
+    await this.followRequestRepository.remove(request);
+
+    return { success: true };
+  }
+
+  /** Takip isteğini reddet */
+  async rejectFollowRequest(requestId: string, recipientId: string): Promise<{ success: boolean }> {
+    const request = await this.followRequestRepository.findOne({
+      where: { id: requestId, recipientId },
+    });
+
+    if (!request) {
+      throw new NotFoundException('Takip isteği bulunamadı');
+    }
+
+    await this.followRequestRepository.remove(request);
+    return { success: true };
   }
 
   private async updateCounts(followerId: string, followingId: string) {

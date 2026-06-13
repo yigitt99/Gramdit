@@ -6,6 +6,7 @@ import CommunityPage from './pages/CommunityPage';
 import PostDetailPage from './pages/PostDetailPage';
 import ProfilePage from './pages/ProfilePage';
 import NotificationsPage from './pages/NotificationsPage';
+import BookmarksPage from './pages/BookmarksPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import { WebGLShader } from './components/ui/web-gl-shader';
 import useStore from './store';
@@ -80,6 +81,12 @@ function App() {
             <Route path="/notifications" element={
               <ProtectedRoute>
                 <NotificationsPage />
+              </ProtectedRoute>
+            } />
+
+            <Route path="/bookmarks" element={
+              <ProtectedRoute>
+                <BookmarksPage />
               </ProtectedRoute>
             } />
 

@@ -1,13 +1,17 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft, Calendar, Users, ShieldAlert,
   Hash, BookOpen, Sparkles,
-  ImageIcon, MoreVertical, Shield, UserX, Ban, Award, UserCheck
+  ImageIcon, UserX, Ban, X, Edit3, Camera
 } from 'lucide-react';
 import useStore from '@/store';
-import CommunityService, { CommunityResponse, CommunityMemberResponse } from '../services/community.service';
+import CommunityService, {
+  CommunityResponse,
+  CommunityMemberResponse,
+  CommunityBanResponse
+} from '../services/community.service';
 import { LeftSidebar } from '../components/layout/LeftSidebar';
 import { PostCard } from './HomePage';
 import PostService, { PostResponse } from '../services/post.service';
@@ -32,7 +36,25 @@ export default function CommunityPage() {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Edit Community Modal States
+  const [editModalOpen, setEditModalOpen] = useState<boolean>(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const bannerInputRef = useRef<HTMLInputElement>(null);
+
+  const [communityName, setCommunityName] = useState<string>('');
+  const [communityDesc, setCommunityDesc] = useState<string>('');
+  const [communityAvatarUrl, setCommunityAvatarUrl] = useState<string>('');
+  const [communityBannerUrl, setCommunityBannerUrl] = useState<string>('');
+  const [updateLoading, setUpdateLoading] = useState<boolean>(false);
+  const [updateError, setUpdateError] = useState<string | null>(null);
+
   const [isJoined, setIsJoined] = useState<boolean>(false);
+  const [isBanned, setIsBanned] = useState<boolean>(false);
+  const [banDetails, setBanDetails] = useState<{
+    reason: string | null;
+    createdAt: string | null;
+    bannedBy: { username: string; fullName: string | null } | null;
+  } | null>(null);
   const [postText, setPostText] = useState<string>('');
   const [posts, setPosts] = useState<PostResponse[]>([]);
   const [postsLoading, setPostsLoading] = useState<boolean>(true);
@@ -40,10 +62,26 @@ export default function CommunityPage() {
   const [mediaType, setMediaType] = useState<'IMAGE' | 'VIDEO'>('IMAGE');
   const [showMediaInput, setShowMediaInput] = useState<boolean>(false);
   const [publishing, setPublishing] = useState<boolean>(false);
-  const [activeMenuUserId, setActiveMenuUserId] = useState<string | null>(null);
+
   const [selectedMember, setSelectedMember] = useState<CommunityMemberResponse | null>(null);
   const [popupTop, setPopupTop] = useState<number>(100);
   const [roleMenuOpen, setRoleMenuOpen] = useState<boolean>(false);
+
+  // Ban management states
+  const [isBansModalOpen, setIsBansModalOpen] = useState<boolean>(false);
+  const [bannedUsers, setBannedUsers] = useState<CommunityBanResponse[]>([]);
+  const [loadingBans, setLoadingBans] = useState<boolean>(false);
+
+  // Kick Modal States
+  const [isKickModalOpen, setIsKickModalOpen] = useState<boolean>(false);
+  const [kickTargetUser, setKickTargetUser] = useState<CommunityMemberResponse | null>(null);
+  const [kickReason, setKickReason] = useState<string>('');
+
+  // Ban Modal States
+  const [isBanModalOpen, setIsBanModalOpen] = useState<boolean>(false);
+  const [banTargetUser, setBanTargetUser] = useState<CommunityMemberResponse | null>(null);
+  const [banReason, setBanReason] = useState<string>('Şüpheli veya spam hesap');
+  const [banMessageDeleteHistory, setBanMessageDeleteHistory] = useState<string>('Önceki Saat');
 
   const handleMemberClick = (member: CommunityMemberResponse, e: React.MouseEvent) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -56,27 +94,41 @@ export default function CommunityPage() {
   const myMemberEntry = storeUser ? members.find(m => m.userId === storeUser.id) : null;
   const myRole = myMemberEntry?.role;
 
-  const handleKick = async (targetUserId: string) => {
-    if (!community) return;
-    if (!window.confirm('Bu üyeyi topluluktan çıkarmak istediğinize emin misiniz?')) return;
+  const triggerKickModal = (member: CommunityMemberResponse) => {
+    setKickTargetUser(member);
+    setKickReason('');
+    setIsKickModalOpen(true);
+  };
+
+  const executeKick = async () => {
+    if (!community || !kickTargetUser) return;
     try {
-      await CommunityService.kickMember(community.id, targetUserId);
-      setMembers(prev => prev.filter(m => m.userId !== targetUserId));
-      setActiveMenuUserId(null);
+      await CommunityService.kickMember(community.id, kickTargetUser.userId);
+      setMembers(prev => prev.filter(m => m.userId !== kickTargetUser.userId));
+      setSelectedMember(null);
+      setIsKickModalOpen(false);
+      setKickTargetUser(null);
     } catch (err: any) {
       alert(err.response?.data?.message || 'Üye çıkarılamadı');
     }
   };
 
-  const handleBan = async (targetUserId: string) => {
-    if (!community) return;
-    const reason = prompt('Banlama nedeni girin (isteğe bağlı):');
-    if (reason === null) return;
+  const triggerBanModal = (member: CommunityMemberResponse) => {
+    setBanTargetUser(member);
+    setBanReason('Şüpheli veya spam hesap');
+    setBanMessageDeleteHistory('Önceki Saat');
+    setIsBanModalOpen(true);
+  };
+
+  const executeBan = async () => {
+    if (!community || !banTargetUser) return;
     try {
-      await CommunityService.banUser(community.id, targetUserId, reason || undefined);
-      setMembers(prev => prev.filter(m => m.userId !== targetUserId));
-      setActiveMenuUserId(null);
-      alert('Kullanıcı başarıyla banlandı');
+      const fullReason = banReason === 'Diğer' ? 'Diğer sebep' : `${banReason} (Geçmiş temizliği: ${banMessageDeleteHistory})`;
+      await CommunityService.banUser(community.id, banTargetUser.userId, fullReason);
+      setMembers(prev => prev.filter(m => m.userId !== banTargetUser.userId));
+      setSelectedMember(null);
+      setIsBanModalOpen(false);
+      setBanTargetUser(null);
     } catch (err: any) {
       alert(err.response?.data?.message || 'Kullanıcı banlanamadı');
     }
@@ -87,10 +139,39 @@ export default function CommunityPage() {
     try {
       await CommunityService.updateMemberRole(community.id, targetUserId, newRole);
       setMembers(prev => prev.map(m => m.userId === targetUserId ? { ...m, role: newRole } : m));
-      setActiveMenuUserId(null);
-      alert('Üye rolü güncellendi');
+      setSelectedMember(prev => prev && prev.userId === targetUserId ? { ...prev, role: newRole } : prev);
     } catch (err: any) {
       alert(err.response?.data?.message || 'Rol güncellenemedi');
+    }
+  };
+
+  const fetchBans = async () => {
+    if (!community) return;
+    setLoadingBans(true);
+    try {
+      const bans = await CommunityService.getBans(community.id);
+      setBannedUsers(bans);
+    } catch (err: any) {
+      console.error('Failed to fetch bans:', err);
+    } finally {
+      setLoadingBans(false);
+    }
+  };
+
+  const handleOpenBansList = () => {
+    setIsBansModalOpen(true);
+    fetchBans();
+  };
+
+  const handleUnban = async (targetUserId: string) => {
+    if (!community) return;
+    if (!window.confirm('Bu kullanıcının banını kaldırmak istediğinize emin misiniz?')) return;
+    try {
+      await CommunityService.unbanUser(community.id, targetUserId);
+      setBannedUsers(prev => prev.filter(b => b.userId !== targetUserId));
+      alert('Kullanıcı banı kaldırıldı.');
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Ban kaldırılamadı');
     }
   };
 
@@ -115,6 +196,10 @@ export default function CommunityPage() {
         setError(null);
         const data = await CommunityService.getBySlug(slug);
         setCommunity(data);
+        setCommunityName(data.name || '');
+        setCommunityDesc(data.description || '');
+        setCommunityAvatarUrl(data.avatarUrl || '');
+        setCommunityBannerUrl(data.bannerUrl || '');
         
         // Fetch members list
         const membersList = await CommunityService.getMembers(data.id);
@@ -124,6 +209,21 @@ export default function CommunityPage() {
         if (storeUser) {
           const isUserMember = membersList.some(m => m.userId === storeUser.id);
           setIsJoined(isUserMember);
+          try {
+            const banStatus = await CommunityService.checkBanStatus(data.id);
+            setIsBanned(banStatus.isBanned);
+            if (banStatus.isBanned) {
+              setBanDetails({
+                reason: banStatus.reason,
+                createdAt: banStatus.createdAt,
+                bannedBy: banStatus.bannedBy,
+              });
+            } else {
+              setBanDetails(null);
+            }
+          } catch (banErr) {
+            console.error('Failed to check ban status:', banErr);
+          }
         }
 
         // Fetch posts
@@ -163,6 +263,74 @@ export default function CommunityPage() {
     } catch (err: any) {
       const msg = err.response?.data?.message || err.message || 'İşlem başarısız';
       alert(msg);
+    }
+  };
+
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !community) return;
+
+    const formData = new FormData();
+    formData.append('avatar', file);
+
+    setUpdateLoading(true);
+    setUpdateError(null);
+    try {
+      const res = await CommunityService.uploadAvatar(community.id, formData);
+      setCommunityAvatarUrl(res.avatarUrl);
+    } catch (err: any) {
+      console.error('Failed to upload community avatar:', err);
+      setUpdateError(err.message || 'Topluluk resmi yüklenirken bir hata oluştu.');
+    } finally {
+      setUpdateLoading(false);
+    }
+  };
+
+  const handleBannerChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !community) return;
+
+    const formData = new FormData();
+    formData.append('banner', file);
+
+    setUpdateLoading(true);
+    setUpdateError(null);
+    try {
+      const res = await CommunityService.uploadBanner(community.id, formData);
+      setCommunityBannerUrl(res.bannerUrl);
+    } catch (err: any) {
+      console.error('Failed to upload community banner:', err);
+      setUpdateError(err.message || 'Kapak resmi yüklenirken bir hata oluştu.');
+    } finally {
+      setUpdateLoading(false);
+    }
+  };
+
+  const handleUpdateCommunity = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!community) return;
+    setUpdateLoading(true);
+    setUpdateError(null);
+    try {
+      const updated = await CommunityService.update(community.id, {
+        name: communityName.trim() || undefined,
+        description: communityDesc.trim(),
+        avatarUrl: communityAvatarUrl.trim() || null,
+        bannerUrl: communityBannerUrl.trim() || null,
+      });
+
+      // Local state güncellemesi
+      setCommunity(updated);
+      setEditModalOpen(false);
+
+      if (updated.slug !== community.slug) {
+        navigate(`/c/${updated.slug}`, { replace: true });
+      }
+    } catch (err: any) {
+      console.error('Failed to update community:', err);
+      setUpdateError(err.message || 'Topluluk güncellenirken bir hata oluştu.');
+    } finally {
+      setUpdateLoading(false);
     }
   };
 
@@ -242,7 +410,14 @@ export default function CommunityPage() {
           </div>
 
           {/* Topluluk Banner */}
-          <div className="relative w-full h-[220px] flex-shrink-0 bg-gradient-to-r from-neutral-900 to-orange-950/20 overflow-hidden">
+          <div
+            className="relative w-full h-[220px] flex-shrink-0 overflow-hidden"
+            style={{
+              background: community.themeColor
+                ? community.themeColor
+                : 'linear-gradient(to right, #171717, rgba(42,18,0,0.2))'
+            }}
+          >
             {hasBanner ? (
               <img
                 src={community.bannerUrl!}
@@ -252,7 +427,7 @@ export default function CommunityPage() {
             ) : (
               <div className="w-full h-full flex items-center justify-center relative opacity-40">
                 <Hash className="w-32 h-32 text-white/5 absolute -right-4 -bottom-4 rotate-12" />
-                <Sparkles className="w-8 h-8 text-[#ff7a00]/30" />
+                <Sparkles className="w-8 h-8 text-white/30" />
               </div>
             )}
           </div>
@@ -291,17 +466,30 @@ export default function CommunityPage() {
                 </p>
               </div>
 
-              {/* Katıl/Katıldın Butonu (Local Simulation) */}
-              <button
-                onClick={handleJoinToggle}
-                className={`px-5 py-1.5 rounded-full text-[13px] font-bold transition-all duration-200 ${
-                  isJoined
-                    ? 'border border-[#ff7a00]/30 text-[#ff7a00] bg-[#ff7a00]/5 hover:bg-[#ff7a00]/10'
-                    : 'bg-[#ff7a00] hover:bg-[#e86e00] text-white'
-                }`}
-              >
-                {isJoined ? 'Katıldın' : 'Katıl'}
-              </button>
+              <div className="flex items-center gap-2">
+                {/* Düzenleme Butonu (Sadece Kurucu veya Moderatör ise) */}
+                {(myRole === 'founder' || myRole === 'moderator') && (
+                  <button
+                    onClick={() => setEditModalOpen(true)}
+                    className="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-[13px] font-bold text-white border border-white/10 hover:bg-white/5 active:scale-[0.97] transition-all"
+                  >
+                    <Edit3 className="w-3.5 h-3.5 text-gray-400" />
+                    Topluluğu Düzenle
+                  </button>
+                )}
+
+                {/* Katıl/Katıldın Butonu (Local Simulation) */}
+                <button
+                  onClick={handleJoinToggle}
+                  className={`px-5 py-1.5 rounded-full text-[13px] font-bold transition-all duration-200 ${
+                    isJoined
+                      ? 'border border-[#ff7a00]/30 text-[#ff7a00] bg-[#ff7a00]/5 hover:bg-[#ff7a00]/10'
+                      : 'bg-[#ff7a00] hover:bg-[#e86e00] text-white'
+                  }`}
+                >
+                  {isJoined ? 'Katıldın' : 'Katıl'}
+                </button>
+              </div>
             </div>
 
             {/* Açıklama */}
@@ -329,7 +517,42 @@ export default function CommunityPage() {
 
           {/* Gönderiler */}
           <div className="flex-1 w-full flex flex-col pb-20">
-            {(
+            {isBanned ? (
+              <div className="flex flex-col items-center justify-center py-20 px-6 text-center max-w-md mx-auto">
+                <div className="w-20 h-20 rounded-full bg-red-600/10 border border-red-600/20 flex items-center justify-center mb-6">
+                  <Ban className="w-10 h-10 text-red-500 animate-pulse" />
+                </div>
+                <h3 className="text-white font-bold text-lg mb-2">Sohbetten Yasaklandınız</h3>
+                {banDetails ? (
+                  <div className="bg-[#111214] border border-[#2b2d31] p-4 rounded-xl text-left w-full mt-4 flex flex-col gap-3">
+                    <div>
+                      <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider block">Yasaklayan Yetkili</span>
+                      <span className="text-sm font-medium text-white">
+                        {banDetails.bannedBy?.fullName || (banDetails.bannedBy?.username ? `@${banDetails.bannedBy.username}` : 'Sistem')}
+                      </span>
+                    </div>
+                    {banDetails.reason && (
+                      <div>
+                        <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider block">Yasaklanma Sebebi</span>
+                        <span className="text-sm text-gray-300 italic">"{banDetails.reason}"</span>
+                      </div>
+                    )}
+                    {banDetails.createdAt && (
+                      <div>
+                        <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider block">Tarih</span>
+                        <span className="text-sm text-gray-400 font-mono">
+                          {new Date(banDetails.createdAt).toLocaleString('tr-TR')}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-gray-500 text-[13px] leading-relaxed">
+                    Bir moderatör yasağınızı kaldırana kadar bu topluluğa katılamaz, gönderi gönderemez veya katkıda bulunamazsınız.
+                  </p>
+                )}
+              </div>
+            ) : (
               <div className="flex flex-col w-full">
                 {/* Twitter Tarzı Post Paylaşma Kutusu - Sadece Üyeler Paylaşabilir */}
                 {isJoined ? (
@@ -531,6 +754,18 @@ export default function CommunityPage() {
                       <span>{community.isPrivate ? 'Gizli Topluluk' : 'Herkese Açık'}</span>
                     </div>
                   </div>
+
+                  {/* Founder/Moderator için Yönetim / Ban Listesi Butonu */}
+                  {(myRole === 'founder' || myRole === 'moderator') && (
+                    <button
+                      type="button"
+                      onClick={handleOpenBansList}
+                      className="mt-2.5 w-full flex items-center justify-center gap-2 px-3 py-2 bg-rose-600/10 hover:bg-rose-600/20 text-rose-500 border border-rose-500/25 rounded-xl text-xs font-bold transition-all"
+                    >
+                      <ShieldAlert className="w-3.5 h-3.5" />
+                      <span>Banlı Kullanıcılar</span>
+                    </button>
+                  )}
                 </div>
               </div>
             )}
@@ -648,7 +883,7 @@ export default function CommunityPage() {
                       <>
                         <button
                           type="button"
-                          onClick={() => handleKick(selectedMember.userId)}
+                          onClick={() => triggerKickModal(selectedMember)}
                           title="Topluluktan Çıkar (Kick)"
                           className="p-1.5 rounded-full bg-black/40 hover:bg-rose-600/80 transition-colors text-white"
                         >
@@ -656,7 +891,7 @@ export default function CommunityPage() {
                         </button>
                         <button
                           type="button"
-                          onClick={() => handleBan(selectedMember.userId)}
+                          onClick={() => triggerBanModal(selectedMember)}
                           title="Topluluktan Banla (Ban)"
                           className="p-1.5 rounded-full bg-black/40 hover:bg-rose-700/80 transition-colors text-white"
                         >
@@ -754,7 +989,6 @@ export default function CommunityPage() {
                                   onClick={() => {
                                     const nextRole = selectedMember.role === 'moderator' ? 'member' : 'moderator';
                                     handleRoleChange(selectedMember.userId, nextRole);
-                                    setSelectedMember(prev => prev ? { ...prev, role: nextRole } : null);
                                     setRoleMenuOpen(false);
                                   }}
                                   className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-white/5 transition-colors text-left text-white"
@@ -770,7 +1004,6 @@ export default function CommunityPage() {
                                   onClick={() => {
                                     const nextRole = selectedMember.role === 'vip' ? 'member' : 'vip';
                                     handleRoleChange(selectedMember.userId, nextRole);
-                                    setSelectedMember(prev => prev ? { ...prev, role: nextRole } : null);
                                     setRoleMenuOpen(false);
                                   }}
                                   className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-white/5 transition-colors text-left text-white"
@@ -785,7 +1018,6 @@ export default function CommunityPage() {
                                   type="button"
                                   onClick={() => {
                                     handleRoleChange(selectedMember.userId, 'member');
-                                    setSelectedMember(prev => prev ? { ...prev, role: 'member' } : null);
                                     setRoleMenuOpen(false);
                                   }}
                                   className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-white/5 transition-colors text-left text-white"
@@ -805,6 +1037,414 @@ export default function CommunityPage() {
                 </div>
               </motion.div>
             </>
+          )}
+        </AnimatePresence>
+
+        {/* Banlı Kullanıcılar Modalı */}
+        <AnimatePresence>
+          {isBansModalOpen && (
+            <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+              {/* Modal Kapatma Overlay */}
+              <div className="absolute inset-0" onClick={() => setIsBansModalOpen(false)} />
+
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="relative bg-[#111214] border border-[#2b2d31] rounded-2xl shadow-2xl w-full max-w-md overflow-hidden text-white flex flex-col max-h-[80vh] z-10"
+              >
+                {/* Header */}
+                <div className="flex items-center justify-between px-4 py-3.5 border-b border-[#2b2d31]">
+                  <div className="flex items-center gap-2">
+                    <ShieldAlert className="w-5 h-5 text-rose-500" />
+                    <h3 className="font-extrabold text-sm tracking-wide">BANLANAN KULLANICILAR</h3>
+                  </div>
+                  <button
+                    onClick={() => setIsBansModalOpen(false)}
+                    className="text-gray-400 hover:text-white transition-colors text-sm font-semibold px-2 py-1 rounded hover:bg-white/5"
+                  >
+                    Kapat
+                  </button>
+                </div>
+
+                {/* Body */}
+                <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+                  {loadingBans ? (
+                    <div className="flex flex-col items-center justify-center py-12 gap-2">
+                      <div className="w-6 h-6 rounded-full border-2 border-t-[#ff7a00] border-r-transparent border-b-transparent border-l-transparent animate-spin" />
+                      <span className="text-xs text-gray-500">Yükleniyor...</span>
+                    </div>
+                  ) : bannedUsers.length === 0 ? (
+                    <div className="text-center py-12 flex flex-col items-center justify-center gap-2">
+                      <Users className="w-10 h-10 text-gray-700" />
+                      <span className="text-xs text-gray-500 font-semibold">Bu toplulukta banlı üye bulunmamaktadır.</span>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-3">
+                      {bannedUsers.map((ban) => {
+                        const init = ban.user.username.slice(0, 2).toUpperCase();
+                        return (
+                          <div key={ban.id} className="flex items-center justify-between gap-3 p-3 bg-[#1e1f22] border border-[#2b2d31] rounded-xl">
+                            <div className="flex items-center gap-3 min-w-0">
+                              {ban.user.avatarUrl ? (
+                                <img
+                                  src={ban.user.avatarUrl}
+                                  alt=""
+                                  className="w-9 h-9 rounded-full object-cover border border-white/5 flex-shrink-0"
+                                />
+                              ) : (
+                                <div className="w-9 h-9 rounded-full bg-neutral-800 border border-white/5 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                                  {init}
+                                </div>
+                              )}
+                              <div className="flex flex-col min-w-0">
+                                <span className="text-xs font-bold text-white truncate">
+                                  {ban.user.fullName || ban.user.username}
+                                </span>
+                                <span className="text-[10px] text-gray-500 truncate leading-none mt-0.5">
+                                  @{ban.user.username}
+                                </span>
+                                {ban.reason && (
+                                  <span className="text-[10px] text-rose-400/80 mt-1 italic truncate" title={ban.reason}>
+                                    Neden: {ban.reason}
+                                  </span>
+                                )}
+                                <span className="text-[9px] text-gray-600 mt-0.5">
+                                  @{ban.bannedBy.username} tarafından banlandı
+                                </span>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleUnban(ban.userId)}
+                              className="px-2.5 py-1.5 bg-rose-600/10 hover:bg-rose-600 hover:text-white text-rose-500 rounded-lg text-[10px] font-bold border border-rose-500/20 hover:border-transparent transition-all flex-shrink-0"
+                            >
+                              Banı Kaldır
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        {/* Custom Kick Modal */}
+        <AnimatePresence>
+          {isKickModalOpen && kickTargetUser && (
+            <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="absolute inset-0" onClick={() => { setIsKickModalOpen(false); setKickTargetUser(null); }} />
+
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="relative bg-[#18191c] border border-[#2b2d31] rounded-2xl shadow-2xl w-full max-w-md overflow-hidden text-white flex flex-col z-10 p-6 animate-in fade-in duration-200"
+              >
+                {/* Header */}
+                <div className="flex items-start justify-between mb-4">
+                  <h3 className="font-extrabold text-lg leading-snug pr-8">
+                    {kickTargetUser.user.username} kullanıcısını sunucudan at
+                  </h3>
+                  <button
+                    onClick={() => { setIsKickModalOpen(false); setKickTargetUser(null); }}
+                    className="text-gray-400 hover:text-white transition-colors"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {/* Subtitle */}
+                <p className="text-xs text-[#b5bac1] leading-normal mb-6">
+                  @{kickTargetUser.user.fullName || kickTargetUser.user.username} adlı kullanıcıyı sunucudan atmak istediğine emin misin? Yeni bir davetle tekrar katılabilir.
+                </p>
+
+                {/* Input label & textarea */}
+                <div className="flex flex-col gap-2 mb-6">
+                  <label className="text-[10px] font-bold text-[#b5bac1] uppercase tracking-wider">Atılma Sebebi</label>
+                  <textarea
+                    rows={3}
+                    maxLength={150}
+                    value={kickReason}
+                    onChange={e => setKickReason(e.target.value)}
+                    placeholder="Sebep girin (isteğe bağlı)..."
+                    className="w-full bg-[#111214] border border-[#2b2d31] rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#ff7a00] text-white resize-none"
+                  />
+                </div>
+
+                {/* Footer Buttons */}
+                <div className="flex gap-3 justify-end">
+                  <button
+                    type="button"
+                    onClick={() => { setIsKickModalOpen(false); setKickTargetUser(null); }}
+                    className="px-6 py-2.5 bg-[#2b2d31]/80 hover:bg-[#2b2d31] text-white rounded-xl text-sm font-bold transition-all"
+                  >
+                    İptal
+                  </button>
+                  <button
+                    type="button"
+                    onClick={executeKick}
+                    className="px-6 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-sm font-bold transition-all"
+                  >
+                    At
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        {/* Custom Ban Modal */}
+        <AnimatePresence>
+          {isBanModalOpen && banTargetUser && (
+            <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="absolute inset-0" onClick={() => { setIsBanModalOpen(false); setBanTargetUser(null); }} />
+
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="relative bg-[#18191c] border border-[#2b2d31] rounded-2xl shadow-2xl w-full max-w-md overflow-hidden text-white flex flex-col z-10 p-6 animate-in fade-in duration-200"
+              >
+                {/* Header */}
+                <div className="flex items-start justify-between mb-5">
+                  <h3 className="font-extrabold text-lg leading-snug pr-8">
+                    @{banTargetUser.user.username} kullanıcısı engellensin mi?
+                  </h3>
+                  <button
+                    onClick={() => { setIsBanModalOpen(false); setBanTargetUser(null); }}
+                    className="text-gray-400 hover:text-white transition-colors"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {/* Subtitle */}
+                <div className="flex flex-col gap-3 mb-5">
+                  <span className="text-[10px] font-bold text-[#b5bac1] uppercase tracking-wider">Yasaklama nedeni *</span>
+                  <div className="flex flex-col gap-2">
+                    {[
+                      'Şüpheli veya spam hesap',
+                      'Ele geçirilmiş veya risk altındaki hesap',
+                      'Sunucu kurallarını ihlal etmek',
+                      'Diğer'
+                    ].map(option => (
+                      <div
+                        key={option}
+                        onClick={() => setBanReason(option)}
+                        className="flex items-center gap-3 cursor-pointer py-1 group"
+                      >
+                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
+                          banReason === option ? 'border-rose-500' : 'border-gray-500 group-hover:border-gray-300'
+                        }`}>
+                          {banReason === option && (
+                            <div className="w-2.5 h-2.5 bg-rose-500 rounded-full" />
+                          )}
+                        </div>
+                        <span className="text-sm text-gray-300 group-hover:text-white font-medium">
+                          {option}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Dropdown for message deletion history */}
+                <div className="flex flex-col gap-2 mb-6">
+                  <label className="text-[10px] font-bold text-[#b5bac1] uppercase tracking-wider">Mesaj Geçmişini Sil</label>
+                  <div className="relative">
+                    <select
+                      value={banMessageDeleteHistory}
+                      onChange={e => setBanMessageDeleteHistory(e.target.value)}
+                      className="w-full bg-[#111214] border border-[#2b2d31] rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-rose-500 text-white appearance-none cursor-pointer"
+                    >
+                      <option value="Önceki Saat">Önceki Saat</option>
+                      <option value="Son 24 Saat">Son 24 Saat</option>
+                      <option value="Son 7 Gün">Son 7 Gün</option>
+                      <option value="Hiçbiri">Hiçbiri</option>
+                    </select>
+                    <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500">
+                      ▼
+                    </div>
+                  </div>
+                </div>
+
+                {/* Footer Buttons */}
+                <div className="flex gap-3 justify-end">
+                  <button
+                    type="button"
+                    onClick={() => { setIsBanModalOpen(false); setBanTargetUser(null); }}
+                    className="px-6 py-2.5 bg-[#2b2d31]/80 hover:bg-[#2b2d31] text-white rounded-xl text-sm font-bold flex-1 transition-all"
+                  >
+                    İptal
+                  </button>
+                  <button
+                    type="button"
+                    onClick={executeBan}
+                    className="px-6 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-sm font-bold flex-1 transition-all"
+                  >
+                    Yasakla
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        {/* ── EDIT COMMUNITY MODAL ── */}
+        <AnimatePresence>
+          {editModalOpen && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 flex items-start justify-center pt-[8vh] px-4"
+              style={{ background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(5px)' }}
+              onClick={(e) => { if (e.target === e.currentTarget && !updateLoading) setEditModalOpen(false); }}
+            >
+              <motion.div
+                initial={{ scale: 0.95, y: -15, opacity: 0 }}
+                animate={{ scale: 1, y: 0, opacity: 1 }}
+                exit={{ scale: 0.95, y: -8, opacity: 0 }}
+                className="w-full max-w-[520px] rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+                style={{ background: '#090909', border: `1px solid rgba(255, 255, 255, 0.08)` }}
+              >
+                {/* Header */}
+                <div className="flex items-center justify-between px-5 py-4 border-b border-white/5 bg-[#090909]">
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setEditModalOpen(false)}
+                      disabled={updateLoading}
+                      className="p-1.5 rounded-full hover:bg-white/5 text-gray-400 hover:text-white transition-all disabled:opacity-30"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                    <span className="text-[15.5px] font-bold text-white">Topluluğu Düzenle</span>
+                  </div>
+
+                  <button
+                    type="submit"
+                    form="edit-community-form"
+                    disabled={updateLoading}
+                    className="px-5 py-1.5 rounded-full text-xs font-bold text-white bg-[#ff7a00] hover:bg-[#e86e00] transition-all disabled:opacity-50"
+                  >
+                    {updateLoading ? 'Kaydediliyor...' : 'Kaydet'}
+                  </button>
+                </div>
+
+                {/* Form Body */}
+                <form
+                  id="edit-community-form"
+                  onSubmit={handleUpdateCommunity}
+                  className="p-5 flex flex-col gap-4 overflow-y-auto max-h-[70vh] bg-transparent"
+                >
+                  {updateError && (
+                    <div className="p-3 rounded-xl bg-rose-500/10 text-rose-500 text-xs font-semibold border border-rose-500/20">
+                      ⚠️ {updateError}
+                    </div>
+                  )}
+
+                  {/* Preview Banner & Avatar Block */}
+                  <div className="flex flex-col gap-2 mb-4">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Topluluk Görseli & Kapak Fotoğrafı</span>
+                    
+                    {/* Gizli Dosya Girişleri */}
+                    <input
+                      type="file"
+                      ref={avatarInputRef}
+                      onChange={handleAvatarChange}
+                      accept="image/*"
+                      className="hidden"
+                    />
+                    <input
+                      type="file"
+                      ref={bannerInputRef}
+                      onChange={handleBannerChange}
+                      accept="image/*"
+                      className="hidden"
+                    />
+
+                    {/* Kapsayıcı Alan */}
+                    <div className="relative w-full h-[130px] mb-8">
+                      {/* Kapak Görseli Kapsayıcısı */}
+                      <div className="relative rounded-xl overflow-hidden border border-white/10 bg-neutral-900 h-full w-full group/banner">
+                        {communityBannerUrl ? (
+                          <img src={communityBannerUrl} alt="Banner Preview" className="w-full h-full object-cover" onError={(e) => { (e.currentTarget as HTMLImageElement).src = ''; }} />
+                        ) : (
+                          <div className="w-full h-full bg-gradient-to-r from-neutral-800 to-neutral-900" />
+                        )}
+
+                        {/* Banner Yükleme Overlay Butonu */}
+                        <button
+                          type="button"
+                          onClick={() => bannerInputRef.current?.click()}
+                          disabled={updateLoading}
+                          className="absolute inset-0 bg-black/50 opacity-0 group-hover/banner:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1.5 text-white text-[11px] font-bold cursor-pointer"
+                        >
+                          <Camera className="w-5 h-5 text-white" />
+                          Kapak Görseli Seç
+                        </button>
+                      </div>
+
+                      {/* Profil Fotoğrafı Kapsayıcısı */}
+                      <div className="absolute -bottom-6 left-6 rounded-full border-[3px] border-[#090909] bg-[#090909] shadow-lg overflow-hidden group/avatar w-16 h-16 z-20">
+                        {communityAvatarUrl ? (
+                          <img src={communityAvatarUrl} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full bg-neutral-950 flex items-center justify-center text-white text-xs font-bold">
+                            {(communityName || 'C').slice(0, 2).toUpperCase()}
+                          </div>
+                        )}
+                        
+                        {/* Avatar Yükleme Overlay Butonu */}
+                        <button
+                          type="button"
+                          onClick={() => avatarInputRef.current?.click()}
+                          disabled={updateLoading}
+                          className="absolute inset-0 bg-black/60 opacity-0 group-hover/avatar:opacity-100 transition-opacity flex items-center justify-center text-white cursor-pointer"
+                        >
+                          <Camera className="w-4 h-4 text-white" />
+                        </button>
+                      </div>
+                    </div>
+                    <span className="text-[10px] text-gray-500 italic text-center">Görselleri değiştirmek için üzerlerine tıklayın</span>
+                  </div>
+
+                  {/* Input: communityName */}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Topluluk Adı</label>
+                    <input
+                      type="text"
+                      required
+                      value={communityName}
+                      onChange={(e) => setCommunityName(e.target.value)}
+                      disabled={updateLoading}
+                      placeholder="Topluluk adı yazın"
+                      className="w-full bg-[#141414] border border-white/10 rounded-xl px-4 py-2.5 text-[14px] text-white placeholder-gray-600 focus:outline-none focus:border-[#ff7a00] transition-colors disabled:opacity-55"
+                    />
+                  </div>
+
+                  {/* Input: Description */}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Açıklama</label>
+                    <textarea
+                      value={communityDesc}
+                      onChange={(e) => setCommunityDesc(e.target.value)}
+                      disabled={updateLoading}
+                      placeholder="Topluluk hakkında bir şeyler paylaşın..."
+                      rows={3}
+                      maxLength={500}
+                      className="w-full bg-[#141414] border border-white/10 rounded-xl px-4 py-2.5 text-[14px] text-white placeholder-gray-600 focus:outline-none focus:border-[#ff7a00] transition-colors disabled:opacity-55 resize-none"
+                    />
+                  </div>
+
+                </form>
+              </motion.div>
+            </motion.div>
           )}
         </AnimatePresence>
 

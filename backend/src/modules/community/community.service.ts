@@ -6,7 +6,10 @@ import { CommunityMember } from './entities/community-member.entity';
 import { User } from '../user/entities/user.entity';
 import { CommunityBan } from './entities/community-ban.entity';
 import { CreateCommunityDto } from './dto/create-community.dto';
+import { UpdateCommunityDto } from './dto/update-community.dto';
 import { CommunityRole } from './enums/community-role.enum';
+import { Notification } from '../notification/entities/notification.entity';
+import { NotificationType } from '../notification/enums/notification-type.enum';
 
 @Injectable()
 export class CommunityService {
@@ -19,6 +22,8 @@ export class CommunityService {
     private readonly userRepository: Repository<User>,
     @InjectRepository(CommunityBan)
     private readonly communityBanRepository: Repository<CommunityBan>,
+    @InjectRepository(Notification)
+    private readonly notificationRepository: Repository<Notification>,
   ) {}
 
   private slugify(text: string): string {
@@ -39,7 +44,7 @@ export class CommunityService {
   }
 
   async create(createCommunityDto: CreateCommunityDto, creatorId: string): Promise<Community> {
-    const { name, description, avatarUrl, bannerUrl, isPrivate } = createCommunityDto;
+    const { name, description, avatarUrl, bannerUrl, isPrivate, themeColor } = createCommunityDto;
 
     // Check if community with same name exists
     const existingName = await this.communityRepository.findOne({ where: { name } });
@@ -70,6 +75,7 @@ export class CommunityService {
         avatarUrl: avatarUrl || null,
         bannerUrl: bannerUrl || null,
         isPrivate: isPrivate ?? false,
+        themeColor: themeColor || '#3F51B5',
         memberCount: 1, // Creator is automatically a member
         createdBy: creator,
       });
@@ -101,6 +107,7 @@ export class CommunityService {
         avatarUrl: true,
         bannerUrl: true,
         isPrivate: true,
+        themeColor: true,
         memberCount: true,
         createdAt: true,
         updatedAt: true,
@@ -117,8 +124,9 @@ export class CommunityService {
   }
 
   async findBySlug(slug: string): Promise<Community> {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slug);
     const community = await this.communityRepository.findOne({
-      where: { slug },
+      where: isUuid ? { id: slug } : { slug },
       relations: { createdBy: true },
       select: {
         id: true,
@@ -128,6 +136,7 @@ export class CommunityService {
         avatarUrl: true,
         bannerUrl: true,
         isPrivate: true,
+        themeColor: true,
         memberCount: true,
         createdAt: true,
         createdBy: {
@@ -138,11 +147,12 @@ export class CommunityService {
     });
 
     if (!community) {
-      throw new NotFoundException(`Community with slug "${slug}" not found`);
+      throw new NotFoundException(`Community with slug or id "${slug}" not found`);
     }
 
     return community;
   }
+
 
   async findMembers(communityId: string): Promise<CommunityMember[]> {
     const community = await this.communityRepository.findOne({ where: { id: communityId } });
@@ -209,6 +219,14 @@ export class CommunityService {
     });
     return !!ban;
   }
+
+  async getBanDetails(communityId: string, userId: string): Promise<CommunityBan | null> {
+    return this.communityBanRepository.findOne({
+      where: { communityId, userId },
+      relations: { bannedBy: true },
+    });
+  }
+
 
   async getBans(communityId: string, requesterId: string): Promise<CommunityBan[]> {
     const requester = await this.communityMemberRepository.findOne({
@@ -278,7 +296,7 @@ export class CommunityService {
       throw new BadRequestException('User is already banned');
     }
 
-    return this.communityRepository.manager.transaction(async (transactionalEntityManager) => {
+    const result = await this.communityRepository.manager.transaction(async (transactionalEntityManager) => {
       const ban = transactionalEntityManager.create(CommunityBan, {
         communityId,
         userId: targetUserId,
@@ -293,8 +311,18 @@ export class CommunityService {
         await transactionalEntityManager.decrement(Community, { id: communityId }, 'memberCount', 1);
       }
 
+      const notif = transactionalEntityManager.create(Notification, {
+        recipientId: targetUserId,
+        senderId: requesterId,
+        type: NotificationType.COMMUNITY_BAN,
+        referenceId: communityId,
+        isRead: false,
+      });
+      await transactionalEntityManager.save(Notification, notif);
+
       return savedBan;
     });
+    return result;
   }
 
   async unbanUser(communityId: string, targetUserId: string, requesterId: string): Promise<void> {
@@ -428,6 +456,66 @@ export class CommunityService {
     await this.communityRepository.manager.transaction(async (transactionalEntityManager) => {
       await transactionalEntityManager.delete(CommunityMember, { id: targetMember.id });
       await transactionalEntityManager.decrement(Community, { id: communityId }, 'memberCount', 1);
+
+      const notif = transactionalEntityManager.create(Notification, {
+        recipientId: targetUserId,
+        senderId: requesterId,
+        type: NotificationType.COMMUNITY_KICK,
+        referenceId: communityId,
+        isRead: false,
+      });
+      await transactionalEntityManager.save(Notification, notif);
     });
+  }
+
+  async updateThemeColor(communityId: string, requesterId: string, themeColor: string | null): Promise<Community> {
+    const requester = await this.communityMemberRepository.findOne({
+      where: { communityId, userId: requesterId },
+    });
+
+    if (!requester || (requester.role !== CommunityRole.FOUNDER && requester.role !== CommunityRole.MODERATOR)) {
+      throw new ForbiddenException('Only founders or moderators can manage community theme');
+    }
+
+    const community = await this.communityRepository.findOne({ where: { id: communityId } });
+    if (!community) {
+      throw new NotFoundException('Community not found');
+    }
+
+    community.themeColor = themeColor;
+    return this.communityRepository.save(community);
+  }
+
+  async update(id: string, requesterId: string, dto: UpdateCommunityDto): Promise<Community> {
+    const member = await this.communityMemberRepository.findOne({
+      where: { communityId: id, userId: requesterId },
+    });
+
+    if (!member || (member.role !== CommunityRole.FOUNDER && member.role !== CommunityRole.MODERATOR)) {
+      throw new ForbiddenException('Only community founders or moderators can update community settings');
+    }
+
+    const community = await this.communityRepository.findOne({ where: { id } });
+    if (!community) {
+      throw new NotFoundException('Community not found');
+    }
+
+    if (dto.name !== undefined) {
+      const trimmedName = dto.name.trim();
+      if (trimmedName && trimmedName !== community.name) {
+        const existing = await this.communityRepository.findOne({ where: { name: trimmedName } });
+        if (existing) {
+          throw new ConflictException('Bu isimde bir topluluk zaten var');
+        }
+        community.name = trimmedName;
+        community.slug = this.slugify(trimmedName);
+      }
+    }
+    if (dto.description !== undefined) community.description = dto.description;
+    if (dto.avatarUrl !== undefined) community.avatarUrl = dto.avatarUrl;
+    if (dto.bannerUrl !== undefined) community.bannerUrl = dto.bannerUrl;
+    if (dto.themeColor !== undefined) community.themeColor = dto.themeColor;
+
+    return this.communityRepository.save(community);
   }
 }

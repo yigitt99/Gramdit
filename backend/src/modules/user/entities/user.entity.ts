@@ -15,6 +15,8 @@ import { Reaction } from '../../reaction/entities/reaction.entity';
 import { Follow } from '../../follow/entities/follow.entity';
 import { Notification } from '../../notification/entities/notification.entity';
 import { CommunityBan } from '../../community/entities/community-ban.entity';
+import { SavedPost } from '../../post/entities/saved-post.entity';
+import { Repost } from '../../post/entities/repost.entity';
 
 @Entity('users')
 @Index('IDX_users_username', ['username'], { unique: true })
@@ -34,6 +36,12 @@ export class User {
 
   @OneToMany(() => Reaction, (reaction) => reaction.user)
   reactions: Reaction[];
+
+  @OneToMany(() => SavedPost, (savedPost) => savedPost.user)
+  savedPosts: SavedPost[];
+
+  @OneToMany(() => Repost, (repost) => repost.user)
+  reposts: Repost[];
 
   @Column({ type: 'integer', default: 0, name: 'follower_count' })
   followerCount: number;
@@ -101,6 +109,13 @@ export class User {
     type: 'varchar',
     length: 500,
     nullable: true,
+  })
+  website: string | null;
+
+  @Column({
+    type: 'varchar',
+    length: 500,
+    nullable: true,
     name: 'avatar_url',
   })
   avatarUrl: string | null;
@@ -126,6 +141,13 @@ export class User {
     name: 'is_active',
   })
   isActive: boolean;
+
+  @Column({
+    type: 'boolean',
+    default: false,
+    name: 'is_private',
+  })
+  isPrivate: boolean;
 
   @CreateDateColumn({
     type: 'timestamp',

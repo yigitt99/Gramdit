@@ -2,8 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, MessageCircle, Repeat2, Heart,
-  Bookmark, Share2, ImageIcon, Smile, X
+  Bookmark, Share2, ImageIcon, Smile, X, Trash2
 } from 'lucide-react';
+import { motion } from 'framer-motion';
 import useStore from '@/store';
 import PostService, { PostResponse, CommentResponse } from '../services/post.service';
 import { LeftSidebar } from '../components/layout/LeftSidebar';
@@ -31,9 +32,19 @@ export default function PostDetailPage() {
   const [comments, setComments] = useState<CommentResponse[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Likes states
+  // Likes & Repost states
   const [liked, setLiked] = useState(false);
   const [likes, setLikes] = useState(0);
+  const [saved, setSaved] = useState(false);
+  const [reposted, setReposted] = useState(false);
+  const [repostsCount, setRepostsCount] = useState(0);
+
+  // Instagram-style animation states
+  const [animateLike, setAnimateLike] = useState(false);
+  const [animateRepost, setAnimateRepost] = useState(false);
+  const [animateSave, setAnimateSave] = useState(false);
+  const [animateComment, setAnimateComment] = useState(false);
+  const [animateShare, setAnimateShare] = useState(false);
 
   // New Comment states
   const [newCommentText, setNewCommentText] = useState('');
@@ -59,6 +70,13 @@ export default function PostDetailPage() {
       setLiked(hasLiked);
       setLikes(postData.reactionCount);
 
+      const hasSaved = postData.savedPosts ? postData.savedPosts.some(s => s.userId === user.id) : false;
+      setSaved(hasSaved);
+
+      const hasReposted = postData.reposts ? postData.reposts.some(r => r.userId === user.id) : false;
+      setReposted(hasReposted);
+      setRepostsCount(postData.repostCount || 0);
+
       const commentsData = await PostService.getComments(id);
       setComments(commentsData);
     } catch (err) {
@@ -75,6 +93,7 @@ export default function PostDetailPage() {
   const handleLike = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!post) return;
+    setAnimateLike(true);
     const newLiked = !liked;
     setLiked(newLiked);
     setLikes(prev => newLiked ? prev + 1 : prev - 1);
@@ -82,8 +101,61 @@ export default function PostDetailPage() {
       await PostService.toggleReaction(post.id, 'LIKE');
     } catch (err) {
       console.error('Failed to toggle post reaction:', err);
-      setLiked(liked);
-      setLikes(likes);
+      setLiked(!newLiked);
+      setLikes(prev => !newLiked ? prev + 1 : prev - 1);
+    }
+  };
+
+  const handleSave = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!post) return;
+    setAnimateSave(true);
+    const newSaved = !saved;
+    setSaved(newSaved);
+    try {
+      if (newSaved) {
+        await PostService.savePost(post.id);
+      } else {
+        await PostService.unsavePost(post.id);
+      }
+    } catch (err) {
+      console.error('Failed to toggle save post:', err);
+      setSaved(!newSaved);
+    }
+  };
+
+  const handleRepost = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!post) return;
+    setAnimateRepost(true);
+    const newReposted = !reposted;
+    setReposted(newReposted);
+    setRepostsCount(prev => newReposted ? prev + 1 : Math.max(0, prev - 1));
+    try {
+      if (newReposted) {
+        await PostService.repost(post.id);
+      } else {
+        await PostService.unrepost(post.id);
+      }
+    } catch (err) {
+      console.error('Failed to toggle repost:', err);
+      setReposted(!newReposted);
+      setRepostsCount(prev => !newReposted ? prev + 1 : Math.max(0, prev - 1));
+    }
+  };
+
+  const handleDelete = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!post) return;
+    if (!window.confirm('Bu gönderiyi silmek istediğinizden emin misiniz?')) {
+      return;
+    }
+    try {
+      await PostService.deletePost(post.id);
+      navigate('/');
+    } catch (err) {
+      console.error('Failed to delete post:', err);
+      alert('Gönderi silinirken bir hata oluştu.');
     }
   };
 
@@ -155,7 +227,7 @@ export default function PostDetailPage() {
   if (loading || !post) {
     return (
       <div className="flex justify-center w-full min-h-screen bg-transparent">
-        <div className="flex w-full max-w-[1225px] h-screen overflow-hidden relative justify-center">
+        <div className="flex w-full max-w-[1380px] h-screen overflow-hidden relative justify-center">
           <LeftSidebar user={user} onCompose={() => navigate('/')} />
           <main className="w-full max-w-[600px] flex-shrink-1 h-screen overflow-y-auto border-r border-[#ffffff14] flex flex-col bg-black/10 backdrop-blur-[1px] items-center justify-center">
             <div className="w-8 h-8 rounded-full border-2 border-t-[#ff7a00] border-r-transparent border-b-transparent border-l-transparent animate-spin" />
@@ -179,7 +251,7 @@ export default function PostDetailPage() {
 
   return (
     <div className="flex justify-center w-full min-h-screen bg-transparent">
-      <div className="flex w-full max-w-[1225px] h-screen overflow-hidden relative justify-center">
+      <div className="flex w-full max-w-[1380px] h-screen overflow-hidden relative justify-center">
         {/* LEFT SIDEBAR */}
         <LeftSidebar user={user} onCompose={() => navigate('/')} />
 
@@ -212,6 +284,15 @@ export default function PostDetailPage() {
                 </p>
                 <p className="text-[13px] text-gray-500 truncate leading-tight">@{post.author.username}</p>
               </div>
+              {post.author.id === user.id && (
+                <button
+                  onClick={handleDelete}
+                  className="p-2 rounded-full text-gray-500 hover:text-red-500 hover:bg-red-500/10 transition-colors ml-auto flex-shrink-0"
+                  title="Gönderiyi Sil"
+                >
+                  <Trash2 className="w-5 h-5" />
+                </button>
+              )}
             </div>
 
             {/* Post Content */}
@@ -261,34 +342,107 @@ export default function PostDetailPage() {
                 <strong className="text-white font-bold">{post.commentCount}</strong> Yanıt
               </span>
               <span className="text-gray-500">
+                <strong className="text-white font-bold">{repostsCount}</strong> Repost
+              </span>
+              <span className="text-gray-500">
                 <strong className="text-white font-bold">{likes}</strong> Beğeni
               </span>
             </div>
 
             {/* Action Bar */}
             <div className="flex items-center justify-around py-2 text-gray-500">
-              <button 
-                onClick={() => commentInputRef.current?.focus()}
+              <motion.button 
+                onClick={() => {
+                  setAnimateComment(true);
+                  commentInputRef.current?.focus();
+                }}
+                whileTap={{ scale: 0.92 }}
+                whileHover={{ scale: 1.05 }}
                 className="p-2 rounded-full hover:bg-[#ff7a00]/10 hover:text-[#ff7a00] transition-colors"
               >
-                <MessageCircle className="w-[20px] h-[20px]" />
-              </button>
-              <button className="p-2 rounded-full hover:bg-green-500/10 hover:text-green-500 transition-colors">
-                <Repeat2 className="w-[20px] h-[20px]" />
-              </button>
-              <button 
+                <motion.div
+                  animate={animateComment ? { scale: [1, 1.25, 0.9, 1.1, 1], rotate: [0, -10, 8, 0] } : { scale: 1, rotate: 0 }}
+                  transition={{ duration: 0.4 }}
+                  onAnimationComplete={() => setAnimateComment(false)}
+                >
+                  <MessageCircle className="w-[22px] h-[22px]" />
+                </motion.div>
+              </motion.button>
+              <motion.button
+                onClick={handleRepost}
+                whileTap={{ scale: 0.92 }}
+                whileHover={{ scale: 1.05 }}
+                className="p-2 rounded-full hover:bg-[#00ba7c]/10 hover:text-[#00ba7c] transition-colors"
+                style={{ color: reposted ? '#00ba7c' : undefined }}
+              >
+                <motion.div
+                  animate={animateRepost ? { scale: [1, 1.3, 0.9, 1.1, 1], rotate: [0, 180] } : { scale: 1, rotate: 0 }}
+                  transition={{ duration: 0.45 }}
+                  onAnimationComplete={() => setAnimateRepost(false)}
+                >
+                  {reposted ? (
+                    <svg className="w-[22px] h-[22px] text-[#00ba7c]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="m17 2 4 4-4 4" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 11v-1a4 4 0 0 1 4-4h14" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="m7 22-4-4 4-4" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M21 13v1a4 4 0 0 1-4 4H3" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="m9 12 2 2 4-4" strokeWidth={2} />
+                    </svg>
+                  ) : (
+                    <Repeat2 className="w-[22px] h-[22px]" />
+                  )}
+                </motion.div>
+              </motion.button>
+              <motion.button 
                 onClick={handleLike}
+                whileTap={{ scale: 0.92 }}
+                whileHover={{ scale: 1.05 }}
                 className="p-2 rounded-full hover:bg-rose-500/10 hover:text-rose-500 transition-colors"
                 style={{ color: liked ? '#f43f5e' : undefined }}
               >
-                <Heart className={`w-[20px] h-[20px] ${liked ? 'fill-rose-500 text-rose-500' : ''}`} />
-              </button>
-              <button className="p-2 rounded-full hover:bg-[#ff7a00]/10 hover:text-[#ff7a00] transition-colors">
-                <Bookmark className="w-[20px] h-[20px]" />
-              </button>
-              <button className="p-2 rounded-full hover:bg-white/5 hover:text-white transition-colors">
-                <Share2 className="w-[20px] h-[20px]" />
-              </button>
+                <motion.div
+                  animate={animateLike ? { scale: [1, 1.45, 0.9, 1.15, 0.95, 1], rotate: [0, -15, 15, -8, 0] } : { scale: 1, rotate: 0 }}
+                  transition={{ duration: 0.45 }}
+                  onAnimationComplete={() => setAnimateLike(false)}
+                >
+                  <Heart className={`w-[22px] h-[22px] ${liked ? 'fill-rose-500 text-rose-500' : ''}`} />
+                </motion.div>
+              </motion.button>
+              <motion.button 
+                onClick={handleSave}
+                whileTap={{ scale: 0.92 }}
+                whileHover={{ scale: 1.05 }}
+                className="p-2 rounded-full hover:bg-[#ff7a00]/10 hover:text-[#ff7a00] transition-colors"
+                style={{ color: saved ? '#ff7a00' : undefined }}
+              >
+                <motion.div
+                  animate={animateSave ? { scale: [1, 1.3, 0.9, 1.1, 1], y: [0, -4, 2, 0] } : { scale: 1, y: 0 }}
+                  transition={{ duration: 0.45 }}
+                  onAnimationComplete={() => setAnimateSave(false)}
+                >
+                  <Bookmark className={`w-[22px] h-[22px] ${saved ? 'fill-[#ff7a00] text-[#ff7a00]' : ''}`} />
+                </motion.div>
+              </motion.button>
+              <motion.button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setAnimateShare(true);
+                  if (post) {
+                    navigator.clipboard.writeText(`${window.location.origin}/posts/${post.id}`).catch(() => {});
+                  }
+                }}
+                whileTap={{ scale: 0.92 }}
+                whileHover={{ scale: 1.05 }}
+                className="p-2 rounded-full hover:bg-white/5 hover:text-white transition-colors"
+              >
+                <motion.div
+                  animate={animateShare ? { scale: [1, 1.25, 0.9, 1.1, 1], rotate: [0, 20, -10, 0], x: [0, 4, -2, 0] } : { scale: 1, rotate: 0, x: 0 }}
+                  transition={{ duration: 0.45 }}
+                  onAnimationComplete={() => setAnimateShare(false)}
+                >
+                  <Share2 className="w-[22px] h-[22px]" />
+                </motion.div>
+              </motion.button>
             </div>
           </div>
 

@@ -8,6 +8,8 @@ interface ApiClientConfig {
 
 class ApiClient {
   private client: AxiosInstance;
+  private isRefreshing = false;
+  private failedQueue: { resolve: (token: string) => void; reject: (error: any) => void }[] = [];
 
   constructor(config: ApiClientConfig) {
     this.client = axios.create({
@@ -17,6 +19,18 @@ class ApiClient {
     });
 
     this.setupInterceptors();
+  }
+
+  private processQueue(error: any, token: string | null = null): void {
+    this.failedQueue.forEach((prom) => {
+      if (error) {
+        prom.reject(error);
+      } else {
+        prom.resolve(token!);
+      }
+    });
+
+    this.failedQueue = [];
   }
 
   private setupInterceptors(): void {
@@ -51,7 +65,23 @@ class ApiClient {
 
         // Auto-refresh token on 401 Unauthorized
         if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
+          if (this.isRefreshing) {
+            return new Promise((resolve, reject) => {
+              this.failedQueue.push({ resolve, reject });
+            })
+              .then((token) => {
+                if (originalRequest.headers) {
+                  originalRequest.headers.Authorization = `Bearer ${token}`;
+                }
+                return this.client(originalRequest);
+              })
+              .catch((err) => {
+                return Promise.reject(err);
+              });
+          }
+
           originalRequest._retry = true;
+          this.isRefreshing = true;
           const refreshToken = localStorage.getItem('gramdit_refresh_token');
 
           if (refreshToken) {
@@ -60,7 +90,6 @@ class ApiClient {
               const refreshResponse = await axios.post(`${baseURL}/auth/refresh`, {
                 refreshToken,
               });
-
 
               const { accessToken, refreshToken: newRefreshToken } = refreshResponse.data;
 
@@ -72,14 +101,18 @@ class ApiClient {
               if (originalRequest.headers) {
                 originalRequest.headers.Authorization = `Bearer ${accessToken}`;
               }
+              this.processQueue(null, accessToken);
               return this.client(originalRequest);
             } catch (refreshError) {
+              this.processQueue(refreshError, null);
               // Revoke session if refresh fails
               localStorage.removeItem('gramdit_token');
               localStorage.removeItem('gramdit_refresh_token');
               localStorage.removeItem('gramdit_user');
               window.location.href = '/login';
               return Promise.reject(refreshError);
+            } finally {
+              this.isRefreshing = false;
             }
           } else {
             // No refresh token available - direct to login

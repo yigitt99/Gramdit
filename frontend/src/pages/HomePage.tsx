@@ -16,7 +16,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Heart, MessageCircle, Bookmark,
   Repeat2, Share2, ImageIcon, X,
-  Smile, Sparkles
+  Smile, Sparkles, Trash2
 } from 'lucide-react';
 import useStore from '@/store';
 import PostService, { PostResponse, CommentResponse } from '../services/post.service';
@@ -275,7 +275,10 @@ function ReplyCommentModal({
         exit={{ opacity: 0 }}
         className="fixed inset-0 z-50 flex items-start justify-center pt-[10vh] px-4"
         style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(4px)' }}
-        onClick={(e) => { if (e.target === e.currentTarget && !loading) onClose(); }}
+        onClick={(e) => {
+          e.stopPropagation();
+          if (e.target === e.currentTarget && !loading) onClose();
+        }}
       >
         <motion.div
           initial={{ scale: 0.96, y: -10 }}
@@ -490,37 +493,138 @@ function ReplyCommentModal({
 }
 
 // ─── POST CARD ─────────────────────────────────────────────────────────────
-export function PostCard({ post }: { post: PostResponse }) {
+export function PostCard({
+  post,
+  onDelete,
+  onLikeToggle,
+  onSaveToggle,
+  onRepostToggle
+}: {
+  post: PostResponse;
+  onDelete?: (id: string) => void;
+  onLikeToggle?: (id: string, newLiked: boolean) => void;
+  onSaveToggle?: (id: string, newSaved: boolean) => void;
+  onRepostToggle?: (id: string, newReposted: boolean) => void;
+}) {
   const storeUser = useStore(s => s.user);
   const user = (storeUser ?? MOCK_USER) as AppUser;
   const navigate = useNavigate();
 
+  const [deleted, setDeleted] = useState(false);
   const initialLiked = post.reactions ? post.reactions.some(r => r.userId === user.id && r.reactionType === 'LIKE') : false;
+  const initialSaved = post.savedPosts ? post.savedPosts.some(s => s.userId === user.id) : false;
+  const initialReposted = post.reposts ? post.reposts.some(r => r.userId === user.id) : false;
   const [liked,  setLiked]  = useState(initialLiked);
   const [likes,  setLikes]  = useState(post.reactionCount);
-  const [saved,  setSaved]  = useState(false);
+  const [saved,  setSaved]  = useState(initialSaved);
+  const [reposted, setReposted] = useState(initialReposted);
+  const [repostsCount, setRepostsCount] = useState(post.repostCount || 0);
+
+  // Instagram-style animation states
+  const [animateLike, setAnimateLike] = useState(false);
+  const [animateRepost, setAnimateRepost] = useState(false);
+  const [animateSave, setAnimateSave] = useState(false);
+  const [animateComment, setAnimateComment] = useState(false);
+  const [animateShare, setAnimateShare] = useState(false);
 
   useEffect(() => {
     const hasLiked = post.reactions ? post.reactions.some(r => r.userId === user.id && r.reactionType === 'LIKE') : false;
     setLiked(hasLiked);
     setLikes(post.reactionCount);
-  }, [post.reactions, post.reactionCount, user.id]);
+
+    const hasSaved = post.savedPosts ? post.savedPosts.some(s => s.userId === user.id) : false;
+    setSaved(hasSaved);
+
+    const hasReposted = post.reposts ? post.reposts.some(r => r.userId === user.id) : false;
+    setReposted(hasReposted);
+    setRepostsCount(post.repostCount || 0);
+  }, [post.reactions, post.reactionCount, post.savedPosts, post.reposts, post.repostCount, user.id]);
 
   const handleLike = async (e: React.MouseEvent) => {
     e.stopPropagation();
+    setAnimateLike(true);
     const newLiked = !liked;
     setLiked(newLiked);
     setLikes(prev => newLiked ? prev + 1 : prev - 1);
+    if (onLikeToggle) {
+      onLikeToggle(post.id, newLiked);
+    }
     try {
       await PostService.toggleReaction(post.id, 'LIKE');
     } catch (err) {
       console.error('Failed to toggle post reaction:', err);
-      setLiked(liked);
-      setLikes(likes);
+      setLiked(!newLiked);
+      setLikes(prev => !newLiked ? prev + 1 : prev - 1);
+      if (onLikeToggle) {
+        onLikeToggle(post.id, !newLiked);
+      }
     }
   };
 
-  const [showComments, setShowComments] = useState(false);
+  const handleDelete = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!window.confirm('Bu gönderiyi silmek istediğinizden emin misiniz?')) {
+      return;
+    }
+    try {
+      await PostService.deletePost(post.id);
+      setDeleted(true);
+      if (onDelete) onDelete(post.id);
+    } catch (err) {
+      console.error('Failed to delete post:', err);
+      alert('Gönderi silinirken bir hata oluştu.');
+    }
+  };
+
+  const handleSave = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setAnimateSave(true);
+    const newSaved = !saved;
+    setSaved(newSaved);
+    if (onSaveToggle) {
+      onSaveToggle(post.id, newSaved);
+    }
+    try {
+      if (newSaved) {
+        await PostService.savePost(post.id);
+      } else {
+        await PostService.unsavePost(post.id);
+      }
+    } catch (err) {
+      console.error('Failed to toggle save post:', err);
+      setSaved(!newSaved);
+      if (onSaveToggle) {
+        onSaveToggle(post.id, !newSaved);
+      }
+    }
+  };
+
+  const handleRepost = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setAnimateRepost(true);
+    const newReposted = !reposted;
+    setReposted(newReposted);
+    setRepostsCount(prev => newReposted ? prev + 1 : Math.max(0, prev - 1));
+    if (onRepostToggle) {
+      onRepostToggle(post.id, newReposted);
+    }
+    try {
+      if (newReposted) {
+        await PostService.repost(post.id);
+      } else {
+        await PostService.unrepost(post.id);
+      }
+    } catch (err) {
+      console.error('Failed to toggle repost:', err);
+      setReposted(!newReposted);
+      setRepostsCount(prev => !newReposted ? prev + 1 : Math.max(0, prev - 1));
+      if (onRepostToggle) {
+        onRepostToggle(post.id, !newReposted);
+      }
+    }
+  };
+
+  const [showComments] = useState(false);
   const [commentModalOpen, setCommentModalOpen] = useState(false);
   const [comments, setComments] = useState<CommentResponse[]>([]);
   const [commentsLoading, setCommentsLoading] = useState(false);
@@ -577,6 +681,8 @@ export function PostCard({ post }: { post: PostResponse }) {
     }
   };
 
+  if (deleted) return null;
+
   return (
     <article 
       onClick={() => navigate(`/posts/${post.id}`)}
@@ -587,18 +693,29 @@ export function PostCard({ post }: { post: PostResponse }) {
       </div>
       <div className="flex-1 min-w-0">
         {/* Header */}
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <span onClick={(e) => { e.stopPropagation(); navigate(`/@${post.author.username}`); }} className="text-[14px] font-bold text-white hover:underline cursor-pointer">{post.author.fullName || post.author.username}</span>
-          <span onClick={(e) => { e.stopPropagation(); navigate(`/@${post.author.username}`); }} className="text-[13px] text-gray-500 hover:underline cursor-pointer">@{post.author.username}</span>
-          <span className="text-xs text-gray-600">·</span>
-          <span className="text-[13px] text-gray-500">{timeStr}</span>
-          {post.community && (
-            <>
-              <span className="text-xs text-gray-600">·</span>
-              <span className="text-[12px] text-[#ff7a00] font-semibold hover:underline">
-                c/{post.community.name}
-              </span>
-            </>
+        <div className="flex justify-between items-start w-full">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span onClick={(e) => { e.stopPropagation(); navigate(`/@${post.author.username}`); }} className="text-[14px] font-bold text-white hover:underline cursor-pointer">{post.author.fullName || post.author.username}</span>
+            <span onClick={(e) => { e.stopPropagation(); navigate(`/@${post.author.username}`); }} className="text-[13px] text-gray-500 hover:underline cursor-pointer">@{post.author.username}</span>
+            <span className="text-xs text-gray-600">·</span>
+            <span className="text-[13px] text-gray-500">{timeStr}</span>
+            {post.community && (
+              <>
+                <span className="text-xs text-gray-600">·</span>
+                <span className="text-[12px] text-[#ff7a00] font-semibold hover:underline">
+                  c/{post.community.name}
+                </span>
+              </>
+            )}
+          </div>
+          {post.author.id === user.id && (
+            <button
+              onClick={handleDelete}
+              className="p-1 rounded-full text-gray-500 hover:text-red-500 hover:bg-red-500/10 transition-colors ml-auto flex-shrink-0"
+              title="Gönderiyi Sil"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
           )}
         </div>
 
@@ -638,38 +755,104 @@ export function PostCard({ post }: { post: PostResponse }) {
 
         {/* Actions */}
         <div className="flex items-center justify-between mt-3 max-w-[420px] -ml-2 text-gray-500">
-          <button
+          <motion.button
             onClick={(e) => {
               e.stopPropagation();
+              setAnimateComment(true);
               setCommentModalOpen(true);
-              setShowComments(true);
             }}
-            className="flex items-center gap-1.5 p-2 rounded-full text-xs font-medium transition-colors hover:text-white"
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(29,155,240,0.1)"; (e.currentTarget as HTMLElement).style.color = "#1d9bf0"; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = ''; }}
+            whileTap={{ scale: 0.92 }}
+            whileHover={{ scale: 1.05 }}
+            className="flex items-center gap-1.5 p-2 rounded-full text-[13px] font-medium transition-colors hover:bg-[#1d9bf0]/10 hover:text-[#1d9bf0]"
           >
-            <MessageCircle className="w-[18px] h-[18px]" />
+            <motion.div
+              animate={animateComment ? { scale: [1, 1.25, 0.9, 1.1, 1], rotate: [0, -10, 8, 0] } : { scale: 1, rotate: 0 }}
+              transition={{ duration: 0.4 }}
+              onAnimationComplete={() => setAnimateComment(false)}
+            >
+              <MessageCircle className="w-[22px] h-[22px]" />
+            </motion.div>
             <span>{fmt(commentsCount)}</span>
-          </button>
+          </motion.button>
 
-          <ActBtn icon={<Repeat2 className="w-[18px] h-[18px]" />} count={0} hov="rgba(0,186,124,0.1)" hovC="#00ba7c" />
+          <motion.button
+            onClick={handleRepost}
+            whileTap={{ scale: 0.92 }}
+            whileHover={{ scale: 1.05 }}
+            className="flex items-center gap-1.5 p-2 rounded-full hover:bg-[#00ba7c]/10 hover:text-[#00ba7c] transition-colors text-[13px] font-medium"
+            style={{ color: reposted ? '#00ba7c' : undefined }}
+          >
+            <motion.div
+              animate={animateRepost ? { scale: [1, 1.3, 0.9, 1.1, 1], rotate: [0, 180] } : { scale: 1, rotate: 0 }}
+              transition={{ duration: 0.45 }}
+              onAnimationComplete={() => setAnimateRepost(false)}
+            >
+              {reposted ? (
+                <svg className="w-[22px] h-[22px] text-[#00ba7c]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m17 2 4 4-4 4" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 11v-1a4 4 0 0 1 4-4h14" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m7 22-4-4 4-4" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 13v1a4 4 0 0 1-4 4H3" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m9 12 2 2 4-4" strokeWidth={2} />
+                </svg>
+              ) : (
+                <Repeat2 className="w-[22px] h-[22px]" />
+              )}
+            </motion.div>
+            <span>{fmt(repostsCount)}</span>
+          </motion.button>
           
-          <button onClick={handleLike}
-            className="flex items-center gap-1.5 p-2 rounded-full hover:bg-rose-500/10 hover:text-rose-500 transition-colors text-xs font-medium"
-            style={{ color: liked ? '#f43f5e' : undefined }}>
-            <Heart className={`w-[18px] h-[18px] ${liked ? 'fill-rose-500 text-rose-500' : ''}`} />
+          <motion.button 
+            onClick={handleLike}
+            whileTap={{ scale: 0.92 }}
+            whileHover={{ scale: 1.05 }}
+            className="flex items-center gap-1.5 p-2 rounded-full hover:bg-rose-500/10 hover:text-rose-500 transition-colors text-[13px] font-medium"
+            style={{ color: liked ? '#f43f5e' : undefined }}
+          >
+            <motion.div
+              animate={animateLike ? { scale: [1, 1.45, 0.9, 1.15, 0.95, 1], rotate: [0, -15, 15, -8, 0] } : { scale: 1, rotate: 0 }}
+              transition={{ duration: 0.45 }}
+              onAnimationComplete={() => setAnimateLike(false)}
+            >
+              <Heart className={`w-[22px] h-[22px] ${liked ? 'fill-rose-500 text-rose-500' : ''}`} />
+            </motion.div>
             <span>{fmt(likes)}</span>
-          </button>
+          </motion.button>
           
-          <button onClick={(e) => { e.stopPropagation(); setSaved(b => !b); }}
+          <motion.button 
+            onClick={handleSave}
+            whileTap={{ scale: 0.92 }}
+            whileHover={{ scale: 1.05 }}
             className="p-2 rounded-full hover:bg-[#ff7a00]/10 hover:text-[#ff7a00] transition-colors"
-            style={{ color: saved ? '#ff7a00' : undefined }}>
-            <Bookmark className={`w-[18px] h-[18px] ${saved ? 'fill-[#ff7a00] text-[#ff7a00]' : ''}`} />
-          </button>
+            style={{ color: saved ? '#ff7a00' : undefined }}
+          >
+            <motion.div
+              animate={animateSave ? { scale: [1, 1.3, 0.9, 1.1, 1], y: [0, -4, 2, 0] } : { scale: 1, y: 0 }}
+              transition={{ duration: 0.45 }}
+              onAnimationComplete={() => setAnimateSave(false)}
+            >
+              <Bookmark className={`w-[22px] h-[22px] ${saved ? 'fill-[#ff7a00] text-[#ff7a00]' : ''}`} />
+            </motion.div>
+          </motion.button>
           
-          <button className="p-2 rounded-full hover:bg-white/5 hover:text-white transition-colors">
-            <Share2 className="w-[18px] h-[18px]" />
-          </button>
+          <motion.button 
+            onClick={(e) => {
+              e.stopPropagation();
+              setAnimateShare(true);
+              navigator.clipboard.writeText(`${window.location.origin}/posts/${post.id}`).catch(() => {});
+            }}
+            whileTap={{ scale: 0.92 }}
+            whileHover={{ scale: 1.05 }}
+            className="p-2 rounded-full hover:bg-white/5 hover:text-white transition-colors"
+          >
+            <motion.div
+              animate={animateShare ? { scale: [1, 1.25, 0.9, 1.1, 1], rotate: [0, 20, -10, 0], x: [0, 4, -2, 0] } : { scale: 1, rotate: 0, x: 0 }}
+              transition={{ duration: 0.45 }}
+              onAnimationComplete={() => setAnimateShare(false)}
+            >
+              <Share2 className="w-[22px] h-[22px]" />
+            </motion.div>
+          </motion.button>
         </div>
 
         {/* Comments Section */}
@@ -725,52 +908,129 @@ export function PostCard({ post }: { post: PostResponse }) {
         user={user}
         onCommentCreated={async () => {
           setCommentsCount(prev => prev + 1);
-          setShowComments(true);
-          await fetchComments();
         }}
       />
     </article>
   );
 }
 
-function ActBtn({ icon, count, hov, hovC }: { icon: React.ReactNode; count: number; hov: string; hovC: string }) {
-  return (
-    <button className="flex items-center gap-1.5 p-2 rounded-full text-xs font-medium transition-colors hover:text-white"
-      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = hov; (e.currentTarget as HTMLElement).style.color = hovC; }}
-      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = ''; }}>
-      {icon} <span>{fmt(count)}</span>
-    </button>
-  );
-}
 
+
+// ─────────────────────────────────────────────────────────────────────────────
 // ─────────────────────────────────────────────────────────────────────────────
 // COMPOSE CARD
 // ─────────────────────────────────────────────────────────────────────────────
-function ComposeCard({ user, onOpen }: { user: AppUser; onOpen: () => void }) {
+function ComposeCard({ user, onPostCreated }: { user: AppUser; onPostCreated: () => void }) {
   const initials = (user.fullName || user.username).slice(0, 2).toUpperCase();
+  const [text, setText] = useState('');
+  const [mediaUrl, setMediaUrl] = useState('');
+  const [mediaType, setMediaType] = useState<'IMAGE' | 'VIDEO'>('IMAGE');
+  const [showMediaInput, setShowMediaInput] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const MAX = 280;
+  const left = MAX - text.length;
+
+  const handlePublish = async () => {
+    if (!text.trim()) return;
+    setLoading(true);
+    setError(null);
+    try {
+      // 1. Gönderiyi oluştur
+      const post = await PostService.create({ content: text });
+      
+      // 2. Eğer medya URL'si girilmişse medyayı ekle
+      if (mediaUrl.trim()) {
+        await PostService.addMedia(post.id, {
+          mediaUrl: mediaUrl.trim(),
+          mediaType: mediaType,
+        });
+      }
+      
+      setText('');
+      setMediaUrl('');
+      setMediaType('IMAGE');
+      setShowMediaInput(false);
+      onPostCreated();
+    } catch (err: any) {
+      console.error('Failed to publish post inline:', err);
+      setError(err.message || 'Gönderi paylaşılırken bir hata oluştu');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <div className="px-4 py-3 border-b border-[#ffffff14] flex gap-3">
-      <Av url={user.avatarUrl} initials={initials} color={T.accent} size={40} className="mt-1 flex-shrink-0" />
-      <div className="flex-1">
-        <textarea
-          onClick={onOpen}
-          readOnly
-          placeholder="Ne paylaşmak istiyorsun?"
-          className="w-full bg-transparent resize-none focus:outline-none text-[16px] leading-relaxed py-2 cursor-pointer placeholder-gray-600"
-          rows={2}
-        />
-        <div className="flex items-center justify-between pt-2.5 border-t border-white/[0.04] mt-2">
-          <div className="flex items-center gap-2">
-            <button onClick={onOpen} className="p-2 rounded-full hover:bg-white/5 text-[#ff7a00] transition-colors" title="Görsel ekle">
-              <ImageIcon className="w-[18px] h-[18px]" />
-            </button>
-            <button onClick={onOpen} className="p-2 rounded-full hover:bg-white/5 text-[#ff7a00] transition-colors" title="Emoji ekle">
-              <Smile className="w-[18px] h-[18px]" />
-            </button>
-          </div>
-          <button onClick={onOpen} className="px-5 py-1.5 rounded-full text-sm font-bold text-white bg-[#ff7a00] hover:bg-[#e86e00] transition-all">
-            Paylaş
+    <div className="px-4 py-3 border-b border-[#ffffff14] flex flex-col gap-2">
+      <div className="flex gap-3">
+        <Av url={user.avatarUrl} initials={initials} color={T.accent} size={40} className="mt-1 flex-shrink-0" />
+        <div className="flex-1">
+          <textarea
+            value={text}
+            onChange={e => setText(e.target.value)}
+            disabled={loading}
+            placeholder="Ne paylaşmak istiyorsun?"
+            className="w-full bg-transparent resize-none focus:outline-none text-[16px] leading-relaxed py-2 placeholder-gray-600 text-white"
+            rows={2}
+          />
+        </div>
+      </div>
+
+      {showMediaInput && (
+        <div className="pl-[52px] pr-2 pb-2 flex gap-2">
+          <input
+            type="text"
+            value={mediaUrl}
+            onChange={e => setMediaUrl(e.target.value)}
+            disabled={loading}
+            placeholder="Görsel veya video URL'si ekleyin (örn. https://...)"
+            className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3.5 py-1.5 text-xs text-white focus:outline-none focus:border-[#ff7a00] disabled:opacity-55"
+          />
+          <select
+            value={mediaType}
+            onChange={e => setMediaType(e.target.value as 'IMAGE' | 'VIDEO')}
+            disabled={loading}
+            className="bg-[#0f0f0f] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#ff7a00] cursor-pointer disabled:opacity-55"
+          >
+            <option value="IMAGE">Resim</option>
+            <option value="VIDEO">Video</option>
+          </select>
+        </div>
+      )}
+
+      {error && (
+        <div className="pl-[52px] text-red-500 text-xs font-semibold pb-2">
+          ⚠️ {error}
+        </div>
+      )}
+
+      <div className="flex items-center justify-between pt-2.5 border-t border-white/[0.04] pl-[52px]">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowMediaInput(p => !p)}
+            disabled={loading}
+            className={`p-2 rounded-full hover:bg-white/5 transition-colors ${showMediaInput ? 'text-[#ff7a00]' : 'text-gray-400'}`}
+            title="Medya ekle"
+          >
+            <ImageIcon className="w-[18px] h-[18px]" />
+          </button>
+        </div>
+
+        <div className="flex items-center gap-3">
+          {text.length > 0 && (
+            <span className="text-[12px] font-medium"
+              style={{ color: left < 0 ? '#f43f5e' : left <= 20 ? '#f59e0b' : T.mutedLo }}>
+              {left}
+            </span>
+          )}
+          <button
+            disabled={!text.trim() || left < 0 || loading}
+            onClick={handlePublish}
+            className="px-5 py-1.5 rounded-full text-sm font-bold text-white bg-[#ff7a00] hover:bg-[#e86e00] disabled:opacity-30 disabled:cursor-not-allowed transition-all active:scale-95"
+            style={{ background: text.trim() && left >= 0 && !loading ? T.accent : undefined }}
+          >
+            {loading ? 'Paylaşılıyor...' : 'Paylaş'}
           </button>
         </div>
       </div>
@@ -946,7 +1206,7 @@ function ComposeModal({ open, onClose, user, onPostCreated }: { open: boolean; o
 // ─────────────────────────────────────────────────────────────────────────────
 // CENTER FEED
 // ─────────────────────────────────────────────────────────────────────────────
-function CenterFeed({ user, onCompose, posts, loading }: { user: AppUser; onCompose: () => void; posts: PostResponse[]; loading: boolean }) {
+function CenterFeed({ user, posts, loading, onPostCreated }: { user: AppUser; posts: PostResponse[]; loading: boolean; onPostCreated: () => void }) {
   const [activeTab, setActiveTab] = useState<'for-you' | 'following'>('for-you');
 
   return (
@@ -992,7 +1252,7 @@ function CenterFeed({ user, onCompose, posts, loading }: { user: AppUser; onComp
       </div>
 
       {/* Compose */}
-      <ComposeCard user={user} onOpen={onCompose} />
+      <ComposeCard user={user} onPostCreated={onPostCreated} />
 
       {/* Posts */}
       <div className="flex flex-col w-full pb-20">
@@ -1054,14 +1314,14 @@ export default function HomePage() {
        * Only the center column scrolls.
        */}
       <div className="flex justify-center w-full min-h-screen bg-transparent">
-        <div className="flex w-full max-w-[1225px] h-screen overflow-hidden relative justify-center">
+        <div className="flex w-full max-w-[1380px] h-screen overflow-hidden relative justify-center">
 
           {/* LEFT SIDEBAR */}
           <LeftSidebar user={user} onCompose={() => setComposeOpen(true)} />
 
           {/* CENTER FEED — scrollable */}
           <main className="w-full max-w-[600px] flex-shrink-1 h-screen overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden border-r border-[#ffffff14] flex flex-col bg-black/10 backdrop-blur-[1px]">
-            <CenterFeed user={user} onCompose={() => setComposeOpen(true)} posts={posts} loading={loading} />
+            <CenterFeed user={user} posts={posts} loading={loading} onPostCreated={fetchPosts} />
           </main>
 
           {/* RIGHT SIDEBAR */}

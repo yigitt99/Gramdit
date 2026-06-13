@@ -1,6 +1,6 @@
 import apiClient from '../api/client';
 
-export type NotificationType = 'FOLLOW' | 'POST_REACTION' | 'COMMENT' | 'COMMENT_REPLY';
+export type NotificationType = 'FOLLOW' | 'FOLLOW_REQUEST' | 'POST_REACTION' | 'COMMENT' | 'COMMENT_REPLY' | 'COMMUNITY_KICK' | 'COMMUNITY_BAN';
 
 export interface NotificationResponse {
   id: string;

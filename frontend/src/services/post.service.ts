@@ -13,12 +13,18 @@ export interface PostReactionResponse {
   reactionType: 'LIKE' | 'UPVOTE' | 'DOWNVOTE';
 }
 
+export interface SavedPostResponse {
+  id: string;
+  userId: string;
+}
+
 export interface PostResponse {
   id: string;
   content: string;
   communityId: string | null;
   commentCount: number;
   reactionCount: number;
+  repostCount: number;
   createdAt: string;
   updatedAt: string;
   author: {
@@ -34,6 +40,8 @@ export interface PostResponse {
   } | null;
   media: PostMediaResponse[];
   reactions?: PostReactionResponse[];
+  savedPosts?: SavedPostResponse[];
+  reposts?: { id: string; userId: string }[];
 }
 
 export interface CreatePostDto {
@@ -111,6 +119,34 @@ const PostService = {
 
   async toggleReaction(postId: string, reactionType: 'LIKE' | 'UPVOTE' | 'DOWNVOTE'): Promise<any> {
     return apiClient.post(`/posts/${postId}/reactions`, { reactionType });
+  },
+
+  async savePost(postId: string): Promise<any> {
+    return apiClient.post(`/posts/${postId}/save`);
+  },
+
+  async unsavePost(postId: string): Promise<any> {
+    return apiClient.delete(`/posts/${postId}/save`);
+  },
+
+  async getSavedPosts(): Promise<PostResponse[]> {
+    return apiClient.get<PostResponse[]>('/users/me/saved-posts');
+  },
+
+  async deletePost(postId: string): Promise<any> {
+    return apiClient.delete(`/posts/${postId}`);
+  },
+
+  async repost(postId: string): Promise<any> {
+    return apiClient.post(`/posts/${postId}/repost`);
+  },
+
+  async unrepost(postId: string): Promise<any> {
+    return apiClient.delete(`/posts/${postId}/repost`);
+  },
+
+  async getUserReposts(username: string): Promise<PostResponse[]> {
+    return apiClient.get<PostResponse[]>(`/users/${username}/reposts`);
   },
 };
 

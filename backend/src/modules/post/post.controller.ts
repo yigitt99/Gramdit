@@ -18,20 +18,20 @@ export class PostController {
 
   @Get('posts')
   @HttpCode(HttpStatus.OK)
-  async findAll() {
-    return this.postService.findAll();
+  async findAll(@Req() req: Request) {
+    return this.postService.findAll(req);
   }
 
   @Get('posts/:id')
   @HttpCode(HttpStatus.OK)
-  async findById(@Param('id') id: string) {
-    return this.postService.findById(id);
+  async findById(@Param('id') id: string, @Req() req: Request) {
+    return this.postService.findById(id, req);
   }
 
   @Get('communities/:slug/posts')
   @HttpCode(HttpStatus.OK)
-  async findCommunityPosts(@Param('slug') slug: string) {
-    return this.postService.findCommunityPosts(slug);
+  async findCommunityPosts(@Param('slug') slug: string, @Req() req: Request) {
+    return this.postService.findCommunityPosts(slug, req);
   }
 
   @Delete('posts/:id')
@@ -40,5 +40,57 @@ export class PostController {
   async delete(@Param('id') id: string, @Req() req: Request) {
     const userId = (req as any).user.sub;
     await this.postService.delete(id, userId);
+  }
+
+  @Post('posts/:id/save')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async save(@Param('id') id: string, @Req() req: Request) {
+    const userId = (req as any).user.sub;
+    return this.postService.savePost(id, userId);
+  }
+
+  @Delete('posts/:id/save')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async unsave(@Param('id') id: string, @Req() req: Request) {
+    const userId = (req as any).user.sub;
+    await this.postService.unsavePost(id, userId);
+  }
+
+  @Get('users/me/saved-posts')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async getSavedPosts(@Req() req: Request) {
+    const userId = (req as any).user.sub;
+    return this.postService.getSavedPosts(userId);
+  }
+
+  @Post('posts/:id/repost')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async repost(@Param('id') id: string, @Req() req: Request) {
+    const userId = (req as any).user.sub;
+    return this.postService.repost(id, userId);
+  }
+
+  @Delete('posts/:id/repost')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async unrepost(@Param('id') id: string, @Req() req: Request) {
+    const userId = (req as any).user.sub;
+    await this.postService.unrepost(id, userId);
+  }
+
+  @Get('posts/:id/reposts')
+  @HttpCode(HttpStatus.OK)
+  async getRepostsForPost(@Param('id') id: string) {
+    return this.postService.getRepostsForPost(id);
+  }
+
+  @Get('users/:username/reposts')
+  @HttpCode(HttpStatus.OK)
+  async getUserReposts(@Param('username') username: string) {
+    return this.postService.getUserReposts(username);
   }
 }

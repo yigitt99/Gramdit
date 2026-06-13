@@ -135,10 +135,10 @@ export class AuthService {
   async generateTokens(user: User) {
     const payload = { sub: user.id, username: user.username, email: user.email, role: user.role };
     
-    // Sign Access Token (e.g. 15m expiration)
+    // Sign Access Token (e.g. 15m or configured expiration)
     const accessToken = this.jwtService.sign(payload, {
       secret: this.configService.get<string>('JWT_SECRET'),
-      expiresIn: '15m',
+      expiresIn: this.configService.get<string>('JWT_EXPIRATION', '15m'),
     });
 
     // Sign Refresh Token (e.g. 7d expiration)

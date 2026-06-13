@@ -22,16 +22,26 @@ import { existsSync, mkdirSync } from 'fs';
 import { UserService } from './user.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 
-const UPLOADS_DIR = join(process.cwd(), 'uploads', 'avatars');
+const AVATARS_DIR = join(process.cwd(), 'uploads', 'avatars');
+const BANNERS_DIR = join(process.cwd(), 'uploads', 'banners');
 
-// Ensure uploads directory exists
-if (!existsSync(UPLOADS_DIR)) {
-  mkdirSync(UPLOADS_DIR, { recursive: true });
-}
+// Ensure uploads directories exist
+if (!existsSync(AVATARS_DIR)) mkdirSync(AVATARS_DIR, { recursive: true });
+if (!existsSync(BANNERS_DIR)) mkdirSync(BANNERS_DIR, { recursive: true });
 
-const multerStorage = diskStorage({
+const avatarStorage = diskStorage({
   destination: (_req: any, _file: any, cb: any) => {
-    cb(null, UPLOADS_DIR);
+    cb(null, AVATARS_DIR);
+  },
+  filename: (_req: any, file: any, cb: any) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    cb(null, uniqueSuffix + extname(file.originalname));
+  },
+});
+
+const bannerStorage = diskStorage({
+  destination: (_req: any, _file: any, cb: any) => {
+    cb(null, BANNERS_DIR);
   },
   filename: (_req: any, file: any, cb: any) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
@@ -82,6 +92,8 @@ export class UserController {
       createdAt: user.createdAt,
       followerCount: user.followerCount,
       followingCount: user.followingCount,
+      website: user.website,
+      isPrivate: user.isPrivate,
     };
   }
 
@@ -105,6 +117,8 @@ export class UserController {
       createdAt: user.createdAt,
       followerCount: user.followerCount,
       followingCount: user.followingCount,
+      website: user.website,
+      isPrivate: user.isPrivate,
     };
   }
 
@@ -112,7 +126,7 @@ export class UserController {
   @HttpCode(HttpStatus.OK)
   @UseInterceptors(
     FileInterceptor('avatar', {
-      storage: multerStorage,
+      storage: avatarStorage,
       limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
       fileFilter: (_req: any, file: any, cb: any) => {
         const allowed = /\.(jpg|jpeg|png|gif|webp)$/i;
@@ -136,5 +150,35 @@ export class UserController {
     // Persist the URL in the database
     const updated = await this.userService.updateProfile(userId, { avatarUrl });
     return { avatarUrl: updated.avatarUrl };
+  }
+
+  @Post('banner')
+  @HttpCode(HttpStatus.OK)
+  @UseInterceptors(
+    FileInterceptor('banner', {
+      storage: bannerStorage,
+      limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+      fileFilter: (_req: any, file: any, cb: any) => {
+        const allowed = /\.(jpg|jpeg|png|gif|webp)$/i;
+        if (!allowed.test(extname(file.originalname))) {
+          return cb(new BadRequestException('Only image files are allowed'), false);
+        }
+        cb(null, true);
+      },
+    }),
+  )
+  async uploadBanner(
+    @Req() req: Request,
+    @UploadedFile() file: any,
+  ) {
+    if (!file) throw new BadRequestException('No file uploaded');
+    const userId = this.extractUserId(req);
+
+    // Build public URL — served statically from /uploads/banners/
+    const bannerUrl = `http://localhost:3000/uploads/banners/${file.filename}`;
+
+    // Persist the URL in the database
+    const updated = await this.userService.updateProfile(userId, { bannerUrl });
+    return { bannerUrl: updated.bannerUrl };
   }
 }

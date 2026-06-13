@@ -14,6 +14,8 @@ import { Community } from '../../community/entities/community.entity';
 import { PostMedia } from '../../post-media/entities/post-media.entity';
 import { Comment } from '../../comment/entities/comment.entity';
 import { Reaction } from '../../reaction/entities/reaction.entity';
+import { SavedPost } from './saved-post.entity';
+import { Repost } from './repost.entity';
 
 @Entity('posts')
 @Index('IDX_posts_author', ['authorId'])
@@ -30,6 +32,12 @@ export class Post {
 
   @OneToMany(() => Reaction, (reaction) => reaction.post)
   reactions: Reaction[];
+
+  @OneToMany(() => SavedPost, (savedPost) => savedPost.post)
+  savedPosts: SavedPost[];
+
+  @OneToMany(() => Repost, (repost) => repost.post)
+  reposts: Repost[];
 
   @Column({ type: 'text', nullable: false })
   content: string;
@@ -53,6 +61,9 @@ export class Post {
 
   @Column({ type: 'integer', default: 0, name: 'reaction_count' })
   reactionCount: number;
+
+  @Column({ type: 'integer', default: 0, name: 'repost_count' })
+  repostCount: number;
 
   @CreateDateColumn({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP', name: 'created_at' })
   createdAt: Date;

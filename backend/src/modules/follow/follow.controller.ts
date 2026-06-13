@@ -17,7 +17,40 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 export class FollowController {
   constructor(private readonly followService: FollowService) {}
 
-  /** POST /users/:id/follow — Takip et */
+  /** GET /users/me/follow-requests — Gelen takip istekleri listesi */
+  @Get('me/follow-requests')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async getFollowRequests(@Req() req: Request) {
+    const currentUserId = (req as any).user.sub;
+    return this.followService.getFollowRequests(currentUserId);
+  }
+
+  /** POST /users/me/follow-requests/:requestId/accept — Takip isteğini kabul et */
+  @Post('me/follow-requests/:requestId/accept')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async acceptFollowRequest(
+    @Param('requestId') requestId: string,
+    @Req() req: Request,
+  ) {
+    const currentUserId = (req as any).user.sub;
+    return this.followService.acceptFollowRequest(requestId, currentUserId);
+  }
+
+  /** POST /users/me/follow-requests/:requestId/reject — Takip isteğini reddet */
+  @Post('me/follow-requests/:requestId/reject')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async rejectFollowRequest(
+    @Param('requestId') requestId: string,
+    @Req() req: Request,
+  ) {
+    const currentUserId = (req as any).user.sub;
+    return this.followService.rejectFollowRequest(requestId, currentUserId);
+  }
+
+  /** POST /users/:id/follow — Takip et veya istek gönder */
   @Post(':id/follow')
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
@@ -29,7 +62,7 @@ export class FollowController {
     return this.followService.follow(followingId, followerId);
   }
 
-  /** DELETE /users/:id/follow — Takibi bırak */
+  /** DELETE /users/:id/follow — Takibi bırak veya isteği iptal et */
   @Delete(':id/follow')
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)

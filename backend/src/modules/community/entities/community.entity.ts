@@ -48,6 +48,9 @@ export class Community {
   @Column({ type: 'boolean', default: false, name: 'is_private' })
   isPrivate: boolean;
 
+  @Column({ type: 'varchar', length: 7, nullable: true, name: 'theme_color', default: '#3F51B5' })
+  themeColor: string | null;
+
   @Column({ type: 'integer', default: 0, name: 'member_count' })
   memberCount: number;
 

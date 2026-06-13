@@ -4,8 +4,8 @@ export class CreateCommunityDto {
   @IsString()
   @IsNotEmpty()
   @Length(3, 100)
-  @Matches(/^[a-zA-Z0-9_\s\-]+$/, {
-    message: 'Name can only contain letters, numbers, spaces, underscores, and hyphens',
+  @Matches(/^[a-zA-Z0-9_ğüşöçıİĞÜŞÖÇ\s\-\'\’]+$/, {
+    message: 'Name can only contain letters, numbers, spaces, underscores, hyphens, and apostrophes',
   })
   name: string;
 
@@ -27,4 +27,10 @@ export class CreateCommunityDto {
   @IsBoolean()
   @IsOptional()
   isPrivate?: boolean;
+
+  @IsString()
+  @IsOptional()
+  @Length(7, 7)
+  @Matches(/^#[0-9a-fA-F]{6}$/, { message: 'themeColor must be a valid hex color code (e.g. #3F51B5)' })
+  themeColor?: string;
 }

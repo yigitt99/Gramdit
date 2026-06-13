@@ -7,10 +7,11 @@ import { CommunityService } from './community.service';
 import { CommunityController } from './community.controller';
 import { CommunityBan } from './entities/community-ban.entity';
 import { AuthModule } from '../auth/auth.module';
+import { Notification } from '../notification/entities/notification.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Community, CommunityMember, User, CommunityBan]),
+    TypeOrmModule.forFeature([Community, CommunityMember, User, CommunityBan, Notification]),
     AuthModule,
   ],
   controllers: [CommunityController],
