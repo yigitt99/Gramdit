@@ -17,6 +17,8 @@ import { Notification } from '../../notification/entities/notification.entity';
 import { CommunityBan } from '../../community/entities/community-ban.entity';
 import { SavedPost } from '../../post/entities/saved-post.entity';
 import { Repost } from '../../post/entities/repost.entity';
+import { DmConversationMember } from '../../dm/entities/dm-conversation-member.entity';
+import { DmMessage } from '../../dm/entities/dm-message.entity';
 
 @Entity('users')
 @Index('IDX_users_username', ['username'], { unique: true })
@@ -42,6 +44,12 @@ export class User {
 
   @OneToMany(() => Repost, (repost) => repost.user)
   reposts: Repost[];
+
+  @OneToMany(() => DmConversationMember, (member) => member.user)
+  dmConversationMembers: DmConversationMember[];
+
+  @OneToMany(() => DmMessage, (message) => message.sender)
+  dmMessages: DmMessage[];
 
   @Column({ type: 'integer', default: 0, name: 'follower_count' })
   followerCount: number;

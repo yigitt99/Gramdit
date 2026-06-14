@@ -15,6 +15,7 @@ import { CommentModule } from './modules/comment/comment.module';
 import { ReactionModule } from './modules/reaction/reaction.module';
 import { FollowModule } from './modules/follow/follow.module';
 import { NotificationModule } from './modules/notification/notification.module';
+import { DmModule } from './modules/dm/dm.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { NotificationModule } from './modules/notification/notification.module';
     ReactionModule,
     FollowModule,
     NotificationModule,
+    DmModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -7,10 +7,12 @@ import PostDetailPage from './pages/PostDetailPage';
 import ProfilePage from './pages/ProfilePage';
 import NotificationsPage from './pages/NotificationsPage';
 import BookmarksPage from './pages/BookmarksPage';
+import MessagesPage from './pages/MessagesPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import { WebGLShader } from './components/ui/web-gl-shader';
 import useStore from './store';
 import AuthService from './services/auth.service';
+import FloatingActionMenu from './components/layout/FloatingActionMenu';
 
 function App() {
   const token = useStore((state) => state.token);
@@ -90,6 +92,12 @@ function App() {
               </ProtectedRoute>
             } />
 
+            <Route path="/messages" element={
+              <ProtectedRoute>
+                <MessagesPage />
+              </ProtectedRoute>
+            } />
+
             <Route path="/communities" element={
               <ProtectedRoute>
                 <div className="flex items-center justify-center min-h-screen text-white text-xl">
@@ -99,6 +107,7 @@ function App() {
             } />
           </Routes>
         </Suspense>
+        <FloatingActionMenu />
       </div>
     </>
   );
